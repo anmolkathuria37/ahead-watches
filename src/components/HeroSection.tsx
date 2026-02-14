@@ -12,8 +12,8 @@ const HeroSection = () => {
           className="w-full h-full object-cover object-center"
           aria-hidden="true"
         />
-        <div className="absolute inset-0 bg-background/70" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/30" />
+        <div className="absolute inset-0 bg-background/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-background/20" />
       </div>
 
       <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
