@@ -147,4 +147,20 @@
     );
     height: 1px;
   }
+
+  .hero-brand-text {
+    background: linear-gradient(
+      180deg,
+      hsl(220 20% 95%) 0%,
+      hsl(220 15% 78%) 30%,
+      hsl(220 10% 55%) 60%,
+      hsl(220 15% 78%) 80%,
+      hsl(220 20% 90%) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: none;
+    filter: drop-shadow(0 0 40px hsl(220 20% 60% / 0.15));
+  }
 }

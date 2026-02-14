@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import aheadLogo from "@/assets/ahead-logo.png";
 import heroWatch from "@/assets/hero-watch.jpg";
 
 const HeroSection = () => {
@@ -18,22 +17,45 @@ const HeroSection = () => {
       </div>
 
       <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
-        <motion.div
+        {/* Brand Name */}
+        <motion.h1
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1, ease: "easeOut" }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+          className="font-display text-7xl sm:text-8xl md:text-9xl font-bold tracking-[0.15em] uppercase mb-2 hero-brand-text select-none"
+          aria-label="AHEAD Watches"
         >
-          <img
-            src={aheadLogo}
-            alt="AHEAD - Be Ahead Of Time"
-            className="mx-auto h-16 md:h-24 lg:h-28 w-auto mb-8"
-          />
+          <span className="inline-block italic -skew-x-6 mr-[-0.02em]">A</span>
+          <span>HEAD</span>
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.8, delay: 0.6 }}
+          className="font-display text-base sm:text-lg md:text-xl tracking-[0.35em] uppercase text-steel-light/70 font-medium mb-10"
+        >
+          Watches
+        </motion.p>
+
+        {/* Tagline with decorative lines */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.9 }}
+          className="flex items-center justify-center gap-4 md:gap-6 mb-14"
+        >
+          <div className="h-px w-10 md:w-16 bg-gradient-to-r from-transparent to-steel-dark" />
+          <p className="text-xs sm:text-sm tracking-[0.4em] uppercase text-steel/80 font-light whitespace-nowrap">
+            Be Ahead Of Time
+          </p>
+          <div className="h-px w-10 md:w-16 bg-gradient-to-l from-transparent to-steel-dark" />
         </motion.div>
 
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.5 }}
+          transition={{ duration: 0.8, delay: 1.2 }}
           className="text-muted-foreground text-lg md:text-xl tracking-wide max-w-xl mx-auto mb-12 font-light"
         >
           Worn by the ambitious. Built for the early movers.
@@ -42,7 +64,7 @@ const HeroSection = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
+          transition={{ duration: 0.8, delay: 1.5 }}
           className="flex flex-col sm:flex-row gap-4 justify-center"
         >
           <a
