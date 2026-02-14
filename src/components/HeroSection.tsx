@@ -1,13 +1,20 @@
 import { motion } from "framer-motion";
 import aheadLogo from "@/assets/ahead-logo.png";
+import heroWatch from "@/assets/hero-watch.jpg";
 
 const HeroSection = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center hero-gradient-bg overflow-hidden">
-      {/* Animated background streaks */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/3 left-1/4 w-96 h-96 rounded-full bg-glow/5 blur-[120px] animate-pulse_glow" />
-        <div className="absolute bottom-1/4 right-1/3 w-72 h-72 rounded-full bg-steel-dark/10 blur-[100px] animate-pulse_glow" style={{ animationDelay: "1.5s" }} />
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Hero background image */}
+      <div className="absolute inset-0">
+        <img
+          src={heroWatch}
+          alt=""
+          className="w-full h-full object-cover object-center"
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 bg-background/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-background/20" />
       </div>
 
       <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
