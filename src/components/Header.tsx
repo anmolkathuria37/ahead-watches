@@ -22,7 +22,7 @@ const Header = () => {
           : "bg-transparent"
       }`}
     >
-      <div className="container mx-auto flex items-center justify-between px-6 py-4">
+      <div className="container mx-auto flex items-center justify-between px-6 py-4 ">
         <a href="#" className="flex items-center gap-3">
           <img src={aheadLogo} alt="AHEAD" className="h-16 md:h-15 w-auto" />
         </a>

@@ -160,7 +160,7 @@ export default function HeroSection() {
             <motion.span
               key={i}
               variants={brandLetter}
-              className="inline-block"
+              className="inline-block "
             >
               {char}
             </motion.span>
