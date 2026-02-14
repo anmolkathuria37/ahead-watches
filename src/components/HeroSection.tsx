@@ -100,20 +100,27 @@ const brandContainer = {
   hidden: {},
   show: {
     transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.2,
+      staggerChildren: 0.06,   // tighter, more premium
+      delayChildren: 0.15,
     },
   },
 };
 
 const brandLetter = {
-  hidden: { opacity: 0, y: 24 },
+  hidden: {
+    opacity: 0,
+    y: 28,
+  },
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.9, ease: "easeOut" },
+    transition: {
+      duration: 0.8,
+      ease: [0.22, 1, 0.36, 1], // cubic-bezier → luxury feel
+    },
   },
 };
+
 
 export default function HeroSection() {
   return (
