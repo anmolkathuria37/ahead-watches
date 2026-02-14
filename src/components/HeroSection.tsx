@@ -22,10 +22,10 @@ const HeroSection = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.2, ease: "easeOut" }}
-          className="font-display text-7xl sm:text-8xl md:text-9xl font-bold tracking-[0.15em] uppercase mb-2 hero-brand-text select-none"
+          className="font-display text-7xl sm:text-8xl md:text-9xl font-bold tracking-[0.08em] uppercase mb-2 hero-brand-text select-none"
           aria-label="AHEAD Watches"
         >
-          <span className="inline-block italic -skew-x-6 mr-[-0.02em]">A</span>
+          <span className="inline-block italic" style={{ fontStyle: 'italic' }}>A</span>
           <span>HEAD</span>
         </motion.h1>
 
