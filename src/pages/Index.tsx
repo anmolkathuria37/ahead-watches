@@ -6,12 +6,14 @@ import FounderDrop from "@/components/FounderDrop";
 import WaitlistSection from "@/components/WaitlistSection";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import Footer from "@/components/Footer";
+import AHEADvideo from "@/components/AHEADvideo";
 
 const Index = () => {
   return (
     <main className="bg-background min-h-screen">
       <Header />
       <HeroSection />
+      <AHEADvideo />
       <PhilosophySection />
       <ProductShowcase />
       <FounderDrop />
