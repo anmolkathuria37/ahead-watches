@@ -12,8 +12,8 @@ const HeroSection = () => {
           className="w-full h-full object-cover object-center"
           aria-hidden="true"
         />
-        <div className="absolute inset-0 bg-background/60" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-background/20" />
+        <div className="absolute inset-0 bg-background/70" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/30" />
       </div>
 
       <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
@@ -45,11 +45,11 @@ const HeroSection = () => {
           transition={{ duration: 0.8, delay: 0.9 }}
           className="flex items-center justify-center gap-4 md:gap-6 mb-14"
         >
-          <div className="h-px w-10 md:w-16 bg-gradient-to-r from-transparent to-steel-dark" />
-          <p className="text-xs sm:text-sm tracking-[0.4em] uppercase text-steel/80 font-light whitespace-nowrap">
+          <div className="h-px w-10 md:w-20 bg-gradient-to-r from-transparent to-steel" />
+          <p className="text-sm sm:text-base md:text-lg tracking-[0.4em] uppercase text-steel-light font-medium drop-shadow-[0_0_12px_hsl(220_20%_70%/0.5)] whitespace-nowrap">
             Be Ahead Of Time
           </p>
-          <div className="h-px w-10 md:w-16 bg-gradient-to-l from-transparent to-steel-dark" />
+          <div className="h-px w-10 md:w-20 bg-gradient-to-l from-transparent to-steel" />
         </motion.div>
 
         <motion.p
