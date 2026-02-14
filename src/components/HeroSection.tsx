@@ -151,7 +151,7 @@ export default function HeroSection() {
         >
           <motion.span
             variants={brandLetter}
-            className="inline-block italic mr-1"
+            className="inline-block italic mr-1 "
           >
             A
           </motion.span>

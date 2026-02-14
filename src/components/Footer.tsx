@@ -1,14 +1,14 @@
-import aheadLogo from "@/assets/ahead-logo.png";
+import aheadLogo from "@/assets/Ahead-Logo-Transparent.png";
 
 const Footer = () => {
   return (
     <footer className="border-t border-border py-16 px-6">
       <div className="max-w-5xl mx-auto flex flex-col items-center text-center gap-8">
-        <img src={aheadLogo} alt="AHEAD" className="h-8 w-auto opacity-70" />
+        <img src={aheadLogo} alt="AHEAD" className="h-32 w-auto opacity-70" />
 
         <div className="flex gap-6">
           <a
-            href="https://instagram.com"
+            href="https://www.instagram.com/theanmolkathuria/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -19,7 +19,7 @@ const Footer = () => {
             </svg>
           </a>
           <a
-            href="https://linkedin.com"
+            href="https://www.linkedin.com/in/theanmolkathuria-137879292"
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground hover:text-foreground transition-colors"
