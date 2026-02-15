@@ -97,7 +97,8 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("admin_token");
-    window.location.href = "/admin/login";
+    // window.location.href = "/admin/login";
+    window.location.href = "/admin"; // Redirect to login page after logout
   };
 
   return (
