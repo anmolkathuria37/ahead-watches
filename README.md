@@ -1,4 +1,4 @@
-# AHED Watches – Frontend
+# AHED Watches – Frontend+Backend
 
 Premium watch brand website built with a modern frontend stack.
 This project powers the landing experience for **AHED Watches**, focusing on
