@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 import Twilio from "twilio";
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
 dotenv.config();
 
 const app = express();
