@@ -163,21 +163,21 @@ const sendConfirmation = async (email, name) => {
 };
 
 
-/* =======================
-   Helper: Send WhatsApp
-======================= */
-const sendWhatsAppConfirmation = async ({phone, name}) => {
-  try {
-    await twilioClient.messages.create({
-      from: process.env.TWILIO_WHATSAPP_NUMBER,
-      to: `whatsapp:${phone}`, // e.g., +91XXXXXXXXXX
-      body: `Hi ${name}, you’re officially on the AHEAD Watches waitlist! ⌚ — The choice of a founder. Follow: @theanmolkathuria`,
-    });
-    console.log("💬 WhatsApp sent to:", phone);
-  } catch (err) {
-    console.error("❌ WhatsApp failed:", err.message);
-  }
-};
+// /* =======================
+//    Helper: Send WhatsApp
+// ======================= */
+// const sendWhatsAppConfirmation = async ({phone, name}) => {
+//   try {
+//     await twilioClient.messages.create({
+//       from: process.env.TWILIO_WHATSAPP_NUMBER,
+//       to: `whatsapp:${phone}`, // e.g., +91XXXXXXXXXX
+//       body: `Hi ${name}, you’re officially on the AHEAD Watches waitlist! ⌚ — The choice of a founder. Follow: @theanmolkathuria`,
+//     });
+//     console.log("💬 WhatsApp sent to:", phone);
+//   } catch (err) {
+//     console.error("❌ WhatsApp failed:", err.message);
+//   }
+// };
 
 /* =======================
    Waitlist API
@@ -249,7 +249,7 @@ app.post("/api/waitlist", async (req, res) => {
 
     // Send Email + WhatsApp
     sendConfirmation(email, name); // correct email helper
-    sendWhatsAppConfirmation({ phone, name }); // object syntax
+    // sendWhatsAppConfirmation({ phone, name }); // object syntax
 
     return res.status(201).json({ message: "Successfully joined waitlist" });
   } catch (err) {
@@ -287,19 +287,41 @@ app.post("/api/admin/login", (req, res) => {
 /* =======================
    Admin Middleware
 ======================= */
+// const adminAuth = (req, res, next) => {
+//   const authHeader = req.headers.authorization;
+
+//   if (!authHeader) {
+//     return res.status(401).json({ message: "No token provided" });
+//   }
+
+//   const token = authHeader.split(" ")[1];
+
+//   try {
+//     jwt.verify(token, process.env.JWT_SECRET);
+//     next();
+//   } catch {
+//     return res.status(403).json({ message: "Invalid or expired token" });
+//   }
+// };
+
 const adminAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader) {
-    return res.status(401).json({ message: "No token provided" });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Invalid token format" });
   }
 
   const token = authHeader.split(" ")[1];
 
+  if (!token) {
+    return res.status(401).json({ message: "Token missing" });
+  }
+
   try {
-    jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.admin = decoded; // optional, future-proof
     next();
-  } catch {
+  } catch (err) {
     return res.status(403).json({ message: "Invalid or expired token" });
   }
 };
