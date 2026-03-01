@@ -57,7 +57,60 @@ export default function AdminDashboard() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<WaitlistEntry>>({});
 
+
+  // Grevidnce Portal Update
+  const [editingGrievanceId, setEditingGrievanceId] = useState<string | null>(null);
+  const [editGrievanceForm, setEditGrievanceForm] = useState<Partial<Grievance>>({});
+  // ------------------------------------------------------------------------------
+
   const token = localStorage.getItem("admin_token");
+
+  // Grevience Portal Update 
+  const handleDeleteGrievance = async (id: string) => {
+    if (!confirm("Delete this grievance?")) return;
+
+    try {
+      const res = await fetch(API + `/api/admin/grievances/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: "Bearer " + token },
+      });
+
+      if (res.ok) {
+        setGrievances((prev) => prev.filter((g) => g._id !== id));
+        toast.success("Grievance deleted");
+      } else {
+        toast.error("Failed to delete");
+      }
+    } catch {
+      toast.error("Error deleting grievance");
+    }
+  };
+  // ------------------------------------------------------------------------------
+
+  // grevience Portal update  
+  const handleUpdateGrievance = async (id: string) => {
+    try {
+      const res = await fetch(API + `/api/admin/grievances/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+        body: JSON.stringify(editGrievanceForm),
+      });
+
+      if (res.ok) {
+        toast.success("Grievance updated");
+        setEditingGrievanceId(null);
+        fetchData();
+      } else {
+        toast.error("Failed to update");
+      }
+    } catch {
+      toast.error("Error updating grievance");
+    }
+  };
+  // ----------------------------------------------------------------
 
   const fetchData = async () => {
     try {
@@ -192,9 +245,8 @@ export default function AdminDashboard() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-2.5 text-xs tracking-widest uppercase rounded-md transition-all font-medium ${
-                tab === t ? "bg-gradient-steel text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`px-5 py-2.5 text-xs tracking-widest uppercase rounded-md transition-all font-medium ${tab === t ? "bg-gradient-steel text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {t}
             </button>
@@ -345,11 +397,10 @@ export default function AdminDashboard() {
                           <td className="p-3 text-muted-foreground">{u.phone || "—"}</td>
                           <td className="p-3">{MODEL_LABELS[u.model] || u.model}</td>
                           <td className="p-3">
-                            <span className={`text-xs font-medium px-2 py-1 rounded ${
-                              u.preorder === "yes" ? "bg-emerald-400/10 text-emerald-400" :
+                            <span className={`text-xs font-medium px-2 py-1 rounded ${u.preorder === "yes" ? "bg-emerald-400/10 text-emerald-400" :
                               u.preorder === "maybe" ? "bg-amber-400/10 text-amber-400" :
-                              "bg-red-400/10 text-red-400"
-                            }`}>
+                                "bg-red-400/10 text-red-400"
+                              }`}>
                               {u.preorder === "yes" ? "Interested" : u.preorder === "maybe" ? "Maybe" : "Not Interested"}
                             </span>
                           </td>
@@ -373,7 +424,7 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
-        {/* GRIEVANCES */}
+        {/* GRIEVANCES
         {tab === "grievances" && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
             <h2 className="font-display text-xl font-bold mb-4">User Grievances</h2>
@@ -393,6 +444,109 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <p className="text-muted-foreground text-sm mt-2">{g.message}</p>
+                </GlassCard>
+              ))
+            )}
+          </motion.div>
+        )} */}
+
+        {/* GRIEVANCES */}
+        {tab === "grievances" && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+            <h2 className="font-display text-xl font-bold mb-4">User Grievances</h2>
+
+            {grievances.length === 0 ? (
+              <GlassCard hover={false}>
+                <p className="text-muted-foreground text-center py-8">
+                  No grievances submitted yet.
+                </p>
+              </GlassCard>
+            ) : (
+              grievances.map((g) => (
+                <GlassCard key={g._id} hover={false}>
+                  {editingGrievanceId === g._id ? (
+                    <>
+                      {/* EDIT MODE */}
+                      <input
+                        value={editGrievanceForm.subject || ""}
+                        onChange={(e) =>
+                          setEditGrievanceForm({
+                            ...editGrievanceForm,
+                            subject: e.target.value,
+                          })
+                        }
+                        className="bg-input border border-border rounded px-3 py-2 text-sm w-full mb-3"
+                        placeholder="Subject"
+                      />
+
+                      <textarea
+                        value={editGrievanceForm.message || ""}
+                        onChange={(e) =>
+                          setEditGrievanceForm({
+                            ...editGrievanceForm,
+                            message: e.target.value,
+                          })
+                        }
+                        className="bg-input border border-border rounded px-3 py-2 text-sm w-full mb-3"
+                        rows={4}
+                        placeholder="Message"
+                      />
+
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() => handleUpdateGrievance(g._id)}
+                          className="text-emerald-400 hover:text-emerald-300 text-xs uppercase tracking-wider"
+                        >
+                          Save
+                        </button>
+
+                        <button
+                          onClick={() => setEditingGrievanceId(null)}
+                          className="text-muted-foreground hover:text-foreground text-xs uppercase tracking-wider"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* VIEW MODE */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="font-semibold text-foreground">
+                            {g.subject}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {g.userName} ({g.userEmail}) •{" "}
+                            {new Date(g.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+
+                        <div className="flex gap-4">
+                          <button
+                            onClick={() => {
+                              setEditingGrievanceId(g._id);
+                              setEditGrievanceForm(g);
+                            }}
+                            className="text-steel-light hover:text-foreground text-xs uppercase tracking-wider"
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteGrievance(g._id)}
+                            className="text-red-400 hover:text-red-300 text-xs uppercase tracking-wider"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      <p className="text-muted-foreground text-sm mt-2">
+                        {g.message}
+                      </p>
+                    </>
+                  )}
                 </GlassCard>
               ))
             )}

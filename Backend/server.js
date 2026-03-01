@@ -326,6 +326,55 @@ const adminAuth = (req, res, next) => {
 /* =======================
    Admin Routes
 ======================= */
+
+
+// Grevience Portal updates and delete options for admin
+/* =======================
+   Update Grievance (Admin)
+======================= */
+app.put("/api/admin/grievances/:id", adminAuth, async (req, res) => {
+  try {
+    const { subject, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ message: "Subject and message required" });
+    }
+
+    const updated = await Grievance.findByIdAndUpdate(
+      req.params.id,
+      { subject, message },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "Grievance not found" });
+    }
+
+    res.json({ message: "Grievance updated", grievance: updated });
+  } catch (err) {
+    console.error("❌ Update grievance error:", err);
+    res.status(500).json({ message: "Update failed" });
+  }
+});
+
+/* =======================
+   Delete Grievance (Admin)
+======================= */
+app.delete("/api/admin/grievances/:id", adminAuth, async (req, res) => {
+  try {
+    const deleted = await Grievance.findByIdAndDelete(req.params.id);
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Grievance not found" });
+    }
+
+    res.json({ message: "Grievance deleted" });
+  } catch (err) {
+    console.error("❌ Delete grievance error:", err);
+    res.status(500).json({ message: "Delete failed" });
+  }
+});
+// ----------------------------------------------------------------------
 app.get("/api/admin/waitlist", adminAuth, async (req, res) => {
   const data = await Waitlist.find().select("-password").sort({ createdAt: -1 });
   res.json(data);
