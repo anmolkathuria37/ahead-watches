@@ -27,7 +27,7 @@ export default function CinematicVideo() {
           loop
           playsInline
           preload="metadata"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover opacity-10 transition-opacity duration-1000"
         />
 
         {/* Overlays */}
