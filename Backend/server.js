@@ -13,8 +13,49 @@ const app = express();
 /* =======================
    Global Middlewares
 ======================= */
-app.use(cors({ origin: "*" }));
-app.use(express.json());
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",")
+  : ["*"];
+
+app.use(cors({ origin: allowedOrigins }));
+app.use(express.json({ limit: "1mb" }));
+
+// Basic security headers
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
+// Simple in-memory rate limiter
+const rateLimitMap = new Map();
+const rateLimit = (windowMs, maxRequests) => (req, res, next) => {
+  const key = req.ip + req.path;
+  const now = Date.now();
+  const windowStart = now - windowMs;
+
+  if (!rateLimitMap.has(key)) rateLimitMap.set(key, []);
+  const hits = rateLimitMap.get(key).filter((t) => t > windowStart);
+  hits.push(now);
+  rateLimitMap.set(key, hits);
+
+  if (hits.length > maxRequests) {
+    return res.status(429).json({ message: "Too many requests. Please try again later." });
+  }
+  next();
+};
+
+// Cleanup rate limit map every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, hits] of rateLimitMap) {
+    const filtered = hits.filter((t) => t > now - 60000);
+    if (filtered.length === 0) rateLimitMap.delete(key);
+    else rateLimitMap.set(key, filtered);
+  }
+}, 300000);
 
 /* =======================
    MongoDB Connection
@@ -46,6 +87,10 @@ const WaitlistSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+WaitlistSchema.index({ email: 1 });
+WaitlistSchema.index({ createdAt: 1 });
+WaitlistSchema.index({ model: 1, preorder: 1 });
+
 const GrievanceSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "Waitlist", required: true },
@@ -69,6 +114,11 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
+  rateDelta: 1000,
+  rateLimit: 5,
 });
 
 transporter.verify((error) => {
@@ -79,108 +129,176 @@ transporter.verify((error) => {
 /* =======================
    Twilio Setup
 ======================= */
-const twilioClient = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+let twilioClient = null;
+try {
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    twilioClient = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  }
+} catch (err) {
+  console.warn("⚠️ Twilio init failed:", err.message);
+}
 
 /* =======================
-   Email Helpers
+   Email Retry Helper
 ======================= */
-const sendConfirmation = async (email, name) => {
-  try {
-    await transporter.sendMail({
-      from: `"AHEAD Watches" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Congratulations, You're Officially Ahead ⌚",
-      html: `
-        <div style="font-family:Arial,sans-serif; padding:24px; background:#0a0a12; color:#e0e0e8;">
-          <div style="max-width:600px; margin:auto; background:linear-gradient(135deg, #12121a, #1a1a25); padding:40px; border-radius:12px; border:1px solid #2a2a35;">
-            <div style="text-align:center; margin-bottom:30px;">
-              <h1 style="color:#e0e0e8; font-size:32px; margin:0; letter-spacing:4px;">AHEAD</h1>
-              <p style="color:#6a6a7a; font-size:12px; letter-spacing:6px; text-transform:uppercase;">Watches</p>
-            </div>
-            <h2 style="color:#c0c0cc; font-size:24px; margin-bottom:15px;">Congratulations, ${name}!</h2>
-            <p style="font-size:16px; line-height:1.8; color:#a0a0b0;">
-              You've officially secured your spot on the <strong style="color:#e0e0e8;">AHEAD</strong> waitlist!
-              Welcome to an exclusive community of visionaries who value time, style, and innovation.
+const sendMailWithRetry = async (mailOptions, retries = 3) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await transporter.sendMail(mailOptions);
+      return true;
+    } catch (err) {
+      console.error(`❌ Email attempt ${attempt}/${retries} failed:`, err.message);
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000 * attempt)); // exponential backoff
+      }
+    }
+  }
+  return false;
+};
+
+/* =======================
+   Watch Data
+======================= */
+const WATCH_DATA = {
+  "5am": {
+    name: "5:00 AM Edition",
+    description: "Matte black dial. Minimal. Disciplined.",
+    price: "₹4,999",
+    specs: ["42mm case diameter", "Japanese Quartz movement", "5ATM water resistant"],
+    image: "https://ahead-watches.onrender.com/images/watch-5am.jpg",
+  },
+  founder: {
+    name: "Founder's Steel",
+    description: "Silver casing. White dial. Authority.",
+    price: "₹5,999",
+    specs: ["40mm case diameter", "Swiss Quartz movement", "10ATM water resistant"],
+    image: "https://ahead-watches.onrender.com/images/watch-founder.jpg",
+  },
+  midnight: {
+    name: "Midnight Discipline",
+    description: "Deep navy dial. Steel precision.",
+    price: "₹5,499",
+    specs: ["44mm case diameter", "Japanese Quartz movement", "Luminous markers"],
+    image: "https://ahead-watches.onrender.com/images/watch-midnight.jpg",
+  },
+};
+
+/* =======================
+   Email Templates
+======================= */
+const sendConfirmation = async (email, name, model) => {
+  const watch = WATCH_DATA[model] || WATCH_DATA["5am"];
+  const success = await sendMailWithRetry({
+    from: `"AHEAD Watches" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Welcome to AHEAD — You're Officially Ahead ⌚",
+    html: `
+      <div style="font-family:'Helvetica Neue',Arial,sans-serif; padding:0; margin:0; background:#07070d;">
+        <div style="max-width:600px; margin:0 auto; background:linear-gradient(180deg, #0c0c16 0%, #10101c 100%);">
+          <!-- Header -->
+          <div style="text-align:center; padding:48px 40px 24px;">
+            <h1 style="color:#d0d0dc; font-size:36px; margin:0; letter-spacing:6px; font-weight:300;">AHEAD</h1>
+            <p style="color:#505068; font-size:11px; letter-spacing:8px; text-transform:uppercase; margin:8px 0 0;">Watches</p>
+          </div>
+          
+          <!-- Divider -->
+          <div style="width:60px; height:1px; background:linear-gradient(90deg,transparent,#404060,transparent); margin:0 auto 32px;"></div>
+          
+          <!-- Main Content -->
+          <div style="padding:0 40px;">
+            <h2 style="color:#e0e0ec; font-size:22px; font-weight:400; margin:0 0 16px;">Congratulations, ${name}.</h2>
+            <p style="font-size:15px; line-height:1.8; color:#8888a0; margin:0 0 24px;">
+              You've secured your exclusive position on the AHEAD waitlist. Welcome to a community of visionaries who understand that time is the ultimate luxury.
             </p>
-            <p style="font-size:16px; line-height:1.8; color:#a0a0b0;">
-              As the founder, I personally curated this experience for forward-thinkers like you.
-              This is <strong style="color:#e0e0e8;">the choice of a founder</strong>.
-            </p>
-            <div style="margin:30px 0; padding:20px; background:#0f0f18; border-radius:8px; border:1px solid #2a2a35;">
-              <p style="color:#6a6a7a; font-size:11px; letter-spacing:3px; text-transform:uppercase; margin:0 0 8px;">Your Login Credentials</p>
-              <p style="color:#e0e0e8; font-size:14px; margin:0;">Check your email for password details to access your dashboard.</p>
+            
+            <!-- Watch Card -->
+            <div style="background:#0a0a14; border:1px solid #1a1a2a; border-radius:8px; padding:24px; margin:24px 0;">
+              <p style="color:#505068; font-size:10px; letter-spacing:4px; text-transform:uppercase; margin:0 0 12px;">Your Selected Timepiece</p>
+              <h3 style="color:#d0d0dc; font-size:20px; font-weight:500; margin:0 0 8px;">${watch.name}</h3>
+              <p style="color:#707088; font-size:14px; margin:0 0 16px;">${watch.description}</p>
+              <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                ${watch.specs.map((s) => `<span style="color:#606078; font-size:11px; background:#12121e; padding:4px 10px; border-radius:4px; border:1px solid #1a1a28;">${s}</span>`).join("")}
+              </div>
+              <p style="color:#c0c0d0; font-size:18px; margin:20px 0 0; font-weight:500;">Expected: ${watch.price}</p>
             </div>
-            <div style="text-align:center; margin-top:30px;">
-              <a href="https://www.instagram.com/theanmolkathuria" style="color:#8090b0; text-decoration:none; font-size:13px;">@theanmolkathuria</a>
+            
+            <!-- Dashboard CTA -->
+            <div style="text-align:center; margin:32px 0;">
+              <p style="color:#6060778; font-size:13px; margin:0 0 16px;">Your login credentials have been sent in a separate email.</p>
+              <a href="https://aheadwatches.com/login" style="display:inline-block; background:linear-gradient(135deg,#808098,#b0b0c0); color:#0a0a12; padding:12px 32px; text-decoration:none; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-weight:600; border-radius:4px;">Access Dashboard</a>
             </div>
-            <p style="text-align:center; color:#4a4a5a; font-size:11px; margin-top:20px; letter-spacing:2px;">
-              ⌚ Be Ahead Of Time — Anmol, Founder
-            </p>
+          </div>
+          
+          <!-- Footer -->
+          <div style="padding:32px 40px; text-align:center; border-top:1px solid #14141e; margin-top:24px;">
+            <p style="color:#3a3a50; font-size:11px; letter-spacing:2px; margin:0;">Be Ahead Of Time</p>
+            <p style="color:#2a2a3a; font-size:10px; margin:12px 0 0;">© ${new Date().getFullYear()} AHEAD Watches. All rights reserved.</p>
           </div>
         </div>
-      `,
-    });
-    console.log("📨 Confirmation email sent:", email);
-  } catch (err) {
-    console.error("❌ Email failed:", err.message);
-  }
+      </div>
+    `,
+  });
+  if (success) console.log("📨 Confirmation email sent:", email);
+  else console.error("❌ Confirmation email failed after all retries:", email);
 };
 
 const sendPasswordEmail = async (email, name, password) => {
-  try {
-    await transporter.sendMail({
-      from: `"AHEAD Watches" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Your AHEAD Dashboard Access ⌚",
-      html: `
-        <div style="font-family:Arial,sans-serif; padding:24px; background:#0a0a12; color:#e0e0e8;">
-          <div style="max-width:600px; margin:auto; background:linear-gradient(135deg, #12121a, #1a1a25); padding:40px; border-radius:12px; border:1px solid #2a2a35;">
-            <h2 style="color:#c0c0cc; font-size:22px; margin-bottom:15px;">Welcome to AHEAD, ${name}</h2>
-            <p style="color:#a0a0b0; font-size:15px; line-height:1.8;">Your dashboard login credentials:</p>
-            <div style="margin:20px 0; padding:20px; background:#0f0f18; border-radius:8px; border:1px solid #2a2a35;">
-              <p style="color:#6a6a7a; font-size:11px; letter-spacing:3px; text-transform:uppercase; margin:0 0 5px;">Email</p>
-              <p style="color:#e0e0e8; font-size:15px; margin:0 0 15px;">${email}</p>
-              <p style="color:#6a6a7a; font-size:11px; letter-spacing:3px; text-transform:uppercase; margin:0 0 5px;">Password</p>
-              <p style="color:#e0e0e8; font-size:15px; margin:0; font-family:monospace; letter-spacing:1px;">${password}</p>
-            </div>
-            <p style="color:#6a6a7a; font-size:12px;">Keep this safe. You can use it to track your waitlist status.</p>
+  const success = await sendMailWithRetry({
+    from: `"AHEAD Watches" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: "Your AHEAD Dashboard Credentials ⌚",
+    html: `
+      <div style="font-family:'Helvetica Neue',Arial,sans-serif; padding:0; margin:0; background:#07070d;">
+        <div style="max-width:600px; margin:0 auto; background:linear-gradient(180deg, #0c0c16 0%, #10101c 100%); padding:48px 40px;">
+          <h1 style="color:#d0d0dc; font-size:28px; margin:0 0 8px; font-weight:400;">Welcome, ${name}</h1>
+          <p style="color:#606078; font-size:13px; margin:0 0 32px;">Your personal dashboard is ready.</p>
+          
+          <div style="background:#0a0a14; border:1px solid #1a1a2a; border-radius:8px; padding:24px;">
+            <p style="color:#505068; font-size:10px; letter-spacing:4px; text-transform:uppercase; margin:0 0 16px;">Login Credentials</p>
+            
+            <p style="color:#606078; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin:0 0 4px;">Email</p>
+            <p style="color:#d0d0dc; font-size:15px; margin:0 0 20px;">${email}</p>
+            
+            <p style="color:#606078; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin:0 0 4px;">Password</p>
+            <p style="color:#d0d0dc; font-size:16px; margin:0; font-family:monospace; letter-spacing:2px; background:#0e0e18; padding:8px 12px; border-radius:4px; border:1px solid #1a1a28; display:inline-block;">${password}</p>
           </div>
+          
+          <p style="color:#404058; font-size:12px; margin:24px 0 0;">Keep these credentials secure. Do not share them.</p>
         </div>
-      `,
-    });
-    console.log("📨 Password email sent:", email);
-  } catch (err) {
-    console.error("❌ Password email failed:", err.message);
-  }
+      </div>
+    `,
+  });
+  if (success) console.log("📨 Password email sent:", email);
+  else console.error("❌ Password email failed after all retries:", email);
 };
 
 const sendGrievanceNotification = async (userName, userEmail, subject, message) => {
-  try {
-    await transporter.sendMail({
-      from: `"AHEAD System" <${process.env.EMAIL_USER}>`,
-      to: process.env.ADMIN_EMAIL,
-      subject: `[Grievance] ${subject} — from ${userName}`,
-      html: `
-        <div style="font-family:Arial,sans-serif; padding:20px;">
-          <h2>New Grievance from ${userName}</h2>
-          <p><strong>Email:</strong> ${userEmail}</p>
-          <p><strong>Subject:</strong> ${subject}</p>
-          <p><strong>Message:</strong></p>
-          <blockquote style="border-left:3px solid #ccc; padding-left:15px; color:#555;">${message}</blockquote>
+  await sendMailWithRetry({
+    from: `"AHEAD System" <${process.env.EMAIL_USER}>`,
+    to: process.env.ADMIN_EMAIL,
+    subject: `[Grievance] ${subject} — from ${userName}`,
+    html: `
+      <div style="font-family:'Helvetica Neue',Arial,sans-serif; padding:24px; background:#07070d;">
+        <div style="max-width:600px; margin:0 auto; background:#0c0c16; padding:32px; border-radius:8px; border:1px solid #1a1a2a;">
+          <h2 style="color:#d0d0dc; font-size:18px; margin:0 0 16px;">New Grievance Received</h2>
+          <p style="color:#8888a0; font-size:14px; margin:0 0 8px;"><strong style="color:#b0b0c0;">From:</strong> ${userName} (${userEmail})</p>
+          <p style="color:#8888a0; font-size:14px; margin:0 0 8px;"><strong style="color:#b0b0c0;">Subject:</strong> ${subject}</p>
+          <div style="margin:16px 0; padding:16px; background:#0a0a14; border-left:3px solid #404060; border-radius:4px;">
+            <p style="color:#8888a0; font-size:14px; line-height:1.7; margin:0;">${message}</p>
+          </div>
         </div>
-      `,
-    });
-  } catch (err) {
-    console.error("❌ Grievance notification failed:", err.message);
-  }
+      </div>
+    `,
+  });
 };
 
 const sendWhatsAppConfirmation = async ({ phone, name }) => {
+  if (!twilioClient) return;
   try {
     await twilioClient.messages.create({
       from: process.env.TWILIO_WHATSAPP_NUMBER,
       to: `whatsapp:${phone}`,
-      body: `Hi ${name}, you're officially on the AHEAD Watches waitlist! ⌚ — The choice of a founder. Follow: @theanmolkathuria`,
+      body: `Hi ${name}, you're officially on the AHEAD Watches waitlist! ⌚ — The choice of a founder.`,
     });
     console.log("💬 WhatsApp sent to:", phone);
   } catch (err) {
@@ -189,23 +307,46 @@ const sendWhatsAppConfirmation = async ({ phone, name }) => {
 };
 
 /* =======================
+   Input Sanitizer
+======================= */
+const sanitize = (str) => {
+  if (typeof str !== "string") return "";
+  return str.replace(/[<>]/g, "").trim();
+};
+
+/* =======================
    Waitlist API
 ======================= */
-app.post("/api/waitlist", async (req, res) => {
+app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
   try {
-    const { name, phone, email, model, preorder } = req.body;
+    const name = sanitize(req.body.name);
+    const phone = sanitize(req.body.phone);
+    const email = sanitize(req.body.email).toLowerCase();
+    const model = sanitize(req.body.model);
+    const preorder = sanitize(req.body.preorder);
 
     if (!name || !phone || !email || !model || !preorder) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Auto-generate password for user login
-    const password = crypto.randomBytes(4).toString("hex"); // 8 char random
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    if (!["5am", "founder", "midnight"].includes(model)) {
+      return res.status(400).json({ message: "Invalid model" });
+    }
+
+    if (!["yes", "maybe", "no"].includes(preorder)) {
+      return res.status(400).json({ message: "Invalid preorder value" });
+    }
+
+    const password = crypto.randomBytes(4).toString("hex");
 
     await Waitlist.create({ name, phone, email, model, preorder, password });
 
-    // Send confirmations
-    sendConfirmation(email, name);
+    // Send confirmations (non-blocking)
+    sendConfirmation(email, name, model);
     sendPasswordEmail(email, name, password);
     sendWhatsAppConfirmation({ phone, name });
 
@@ -222,12 +363,13 @@ app.post("/api/waitlist", async (req, res) => {
 /* =======================
    User Auth
 ======================= */
-app.post("/api/user/login", async (req, res) => {
+app.post("/api/user/login", rateLimit(60000, 10), async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = sanitize(req.body.email).toLowerCase();
+    const password = req.body.password;
     if (!email || !password) return res.status(400).json({ message: "All fields required" });
 
-    const user = await Waitlist.findOne({ email: email.toLowerCase() });
+    const user = await Waitlist.findOne({ email });
     if (!user) return res.status(404).json({ message: "Email not found on waitlist" });
     if (user.password !== password) return res.status(401).json({ message: "Invalid password" });
 
@@ -263,7 +405,6 @@ app.get("/api/user/me", userAuth, async (req, res) => {
     const user = await Waitlist.findById(req.userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Calculate position
     const position = await Waitlist.countDocuments({ createdAt: { $lte: user.createdAt } });
 
     return res.json({ ...user.toObject(), position });
@@ -272,10 +413,12 @@ app.get("/api/user/me", userAuth, async (req, res) => {
   }
 });
 
-app.post("/api/user/grievance", userAuth, async (req, res) => {
+app.post("/api/user/grievance", userAuth, rateLimit(60000, 3), async (req, res) => {
   try {
-    const { subject, message } = req.body;
+    const subject = sanitize(req.body.subject);
+    const message = sanitize(req.body.message);
     if (!subject || !message) return res.status(400).json({ message: "All fields required" });
+    if (subject.length > 200 || message.length > 1000) return res.status(400).json({ message: "Input too long" });
 
     const user = await Waitlist.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -288,7 +431,6 @@ app.post("/api/user/grievance", userAuth, async (req, res) => {
       message,
     });
 
-    // Notify admin
     sendGrievanceNotification(user.name, user.email, subject, message);
 
     return res.json({ message: "Grievance submitted" });
@@ -301,7 +443,7 @@ app.post("/api/user/grievance", userAuth, async (req, res) => {
 /* =======================
    Admin Auth
 ======================= */
-app.post("/api/admin/login", (req, res) => {
+app.post("/api/admin/login", rateLimit(60000, 5), (req, res) => {
   const { email, password } = req.body;
   if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
     const token = jwt.sign({ role: "admin" }, process.env.JWT_SECRET, { expiresIn: "2h" });
@@ -326,29 +468,13 @@ const adminAuth = (req, res, next) => {
 /* =======================
    Admin Routes
 ======================= */
-
-
-// Grevience Portal updates and delete options for admin
-/* =======================
-   Update Grievance (Admin)
-======================= */
 app.put("/api/admin/grievances/:id", adminAuth, async (req, res) => {
   try {
     const { subject, message } = req.body;
+    if (!subject || !message) return res.status(400).json({ message: "Subject and message required" });
 
-    if (!subject || !message) {
-      return res.status(400).json({ message: "Subject and message required" });
-    }
-
-    const updated = await Grievance.findByIdAndUpdate(
-      req.params.id,
-      { subject, message },
-      { new: true }
-    );
-
-    if (!updated) {
-      return res.status(404).json({ message: "Grievance not found" });
-    }
+    const updated = await Grievance.findByIdAndUpdate(req.params.id, { subject, message }, { new: true });
+    if (!updated) return res.status(404).json({ message: "Grievance not found" });
 
     res.json({ message: "Grievance updated", grievance: updated });
   } catch (err) {
@@ -357,24 +483,17 @@ app.put("/api/admin/grievances/:id", adminAuth, async (req, res) => {
   }
 });
 
-/* =======================
-   Delete Grievance (Admin)
-======================= */
 app.delete("/api/admin/grievances/:id", adminAuth, async (req, res) => {
   try {
     const deleted = await Grievance.findByIdAndDelete(req.params.id);
-
-    if (!deleted) {
-      return res.status(404).json({ message: "Grievance not found" });
-    }
-
+    if (!deleted) return res.status(404).json({ message: "Grievance not found" });
     res.json({ message: "Grievance deleted" });
   } catch (err) {
     console.error("❌ Delete grievance error:", err);
     res.status(500).json({ message: "Delete failed" });
   }
 });
-// ----------------------------------------------------------------------
+
 app.get("/api/admin/waitlist", adminAuth, async (req, res) => {
   const data = await Waitlist.find().select("-password").sort({ createdAt: -1 });
   res.json(data);
@@ -407,7 +526,7 @@ app.get("/api/admin/grievances", adminAuth, async (req, res) => {
 /* =======================
    Health Check
 ======================= */
-app.get("/health", (_, res) => res.json({ status: "OK" }));
+app.get("/health", (_, res) => res.json({ status: "OK", uptime: process.uptime() }));
 
 /* =======================
    Server Start
