@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { lazy, Suspense } from "react";
 
 import Index from "./pages/Index";
+import ChatBot from "./components/ChatBot";
 
 const Admin = lazy(() => import("./pages/Admin"));
 const UserLogin = lazy(() => import("./pages/UserLogin"));
