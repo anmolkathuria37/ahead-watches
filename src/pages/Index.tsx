@@ -13,21 +13,24 @@ const Watch3D = lazy(() => import("@/components/Watch3D"));
 
 const Index = () => {
   return (
-    <main className="bg-background min-h-screen">
+    <>
       <Header />
-      <HeroSection />
-      <CinematicVideo />
-      <PhilosophySection />
-      <ProductShowcase />
-      <Suspense fallback={<div className="h-[500px] flex items-center justify-center text-muted-foreground text-sm animate-pulse">Loading 3D Experience...</div>}>
-        <Watch3D />
-      </Suspense>
-      <FounderDrop />
-      <WaitlistSection />
-      <TestimonialsSection />
-      <Footer />
-    </main>
+      <main id="main" className="bg-background min-h-screen">
+        <HeroSection />
+        <CinematicVideo />
+        <PhilosophySection />
+        <ProductShowcase />
+        <Suspense fallback={<div className="h-[500px] flex items-center justify-center text-muted-foreground text-sm animate-pulse">Loading 3D Experience...</div>}>
+          <Watch3D />
+        </Suspense>
+        <FounderDrop />
+        <WaitlistSection />
+        <TestimonialsSection />
+        <Footer />
+      </main>
+    </>
   );
 };
+
 
 export default Index;

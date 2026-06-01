@@ -6,28 +6,51 @@ import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 import Twilio from "twilio";
 import crypto from "crypto";
+import compression from "compression";
+import helmet from "helmet";
+import morgan from "morgan";
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
 
 /* =======================
    Global Middlewares
 ======================= */
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",")
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["*"];
 
-app.use(cors({ origin: allowedOrigins }));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: "1mb" }));
+app.use(compression());
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // API only; CSP belongs on the frontend host
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
-// Basic security headers
+// Additional defensive headers
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
   next();
 });
+
 
 // Simple in-memory rate limiter
 const rateLimitMap = new Map();
@@ -594,11 +617,61 @@ app.post("/api/chat", rateLimit(60000, 20), async (req, res) => {
 /* =======================
    Health Check
 ======================= */
-app.get("/health", (_, res) => res.json({ status: "OK", uptime: process.uptime() }));
-
+app.get("/health", (_, res) =>
+  res.json({
+    status: "OK",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    db: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+  })
+);
 
 /* =======================
-   Server Start
+   404 + Error Middleware
+======================= */
+app.use((req, res) => {
+  res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
+app.use((err, req, res, _next) => {
+  console.error("🔥 Unhandled error:", err);
+  const status = err.status || 500;
+  res.status(status).json({
+    message: status === 500 ? "Internal server error" : err.message,
+  });
+});
+
+/* =======================
+   Process Safety Nets
+======================= */
+process.on("unhandledRejection", (reason) => {
+  console.error("🛑 Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("💥 Uncaught Exception:", err);
+});
+
+/* =======================
+   Server Start + Graceful Shutdown
 ======================= */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+const shutdown = (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
+      console.log("✅ MongoDB connection closed");
+    } catch (e) {
+      console.error("Error closing MongoDB:", e.message);
+    }
+    process.exit(0);
+  });
+  // Force exit after 10s
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
