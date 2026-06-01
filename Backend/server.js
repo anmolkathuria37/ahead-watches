@@ -617,11 +617,61 @@ app.post("/api/chat", rateLimit(60000, 20), async (req, res) => {
 /* =======================
    Health Check
 ======================= */
-app.get("/health", (_, res) => res.json({ status: "OK", uptime: process.uptime() }));
-
+app.get("/health", (_, res) =>
+  res.json({
+    status: "OK",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    db: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+  })
+);
 
 /* =======================
-   Server Start
+   404 + Error Middleware
+======================= */
+app.use((req, res) => {
+  res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
+});
+
+app.use((err, req, res, _next) => {
+  console.error("🔥 Unhandled error:", err);
+  const status = err.status || 500;
+  res.status(status).json({
+    message: status === 500 ? "Internal server error" : err.message,
+  });
+});
+
+/* =======================
+   Process Safety Nets
+======================= */
+process.on("unhandledRejection", (reason) => {
+  console.error("🛑 Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("💥 Uncaught Exception:", err);
+});
+
+/* =======================
+   Server Start + Graceful Shutdown
 ======================= */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+const shutdown = (signal) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
+      console.log("✅ MongoDB connection closed");
+    } catch (e) {
+      console.error("Error closing MongoDB:", e.message);
+    }
+    process.exit(0);
+  });
+  // Force exit after 10s
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
