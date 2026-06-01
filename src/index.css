@@ -60,12 +60,60 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 80px;
   }
+
+  /* Premium text selection */
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
+  }
+
+  /* Custom luxury scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(225 25% 5%);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, hsl(220 10% 30%), hsl(220 8% 20%));
+    border-radius: 8px;
+    border: 2px solid hsl(225 25% 5%);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, hsl(220 15% 45%), hsl(220 10% 30%));
+  }
+  html { scrollbar-color: hsl(220 10% 30%) hsl(225 25% 5%); }
+
+  /* Accessible focus rings */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  img, video { max-width: 100%; height: auto; }
 }
+
 
 @layer utilities {
   .text-gradient-steel {
