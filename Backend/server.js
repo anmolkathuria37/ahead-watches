@@ -18,10 +18,15 @@ app.disable("x-powered-by");
 /* =======================
    Global Middlewares
 ======================= */
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+const allowedOrigins = configuredOrigins.length
+  ? configuredOrigins
+  : process.env.NODE_ENV === "production"
+    ? []
+    : ["http://localhost:8080", "http://127.0.0.1:8080"];
 
 if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   console.error("ALLOWED_ORIGINS must be configured in production; cross-origin browser requests will be denied.");
@@ -70,7 +75,16 @@ const rateLimit = (windowMs, maxRequests) => (req, res, next) => {
   hits.push(now);
   rateLimitMap.set(key, hits);
 
+  // Bound memory use if clients rotate IPs or paths.
+  if (rateLimitMap.size > 10000) {
+    for (const [entryKey, entryHits] of rateLimitMap) {
+      if (!entryHits.some((timestamp) => timestamp > now - windowMs)) rateLimitMap.delete(entryKey);
+      if (rateLimitMap.size <= 9000) break;
+    }
+  }
+
   if (hits.length > maxRequests) {
+    res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
     return res.status(429).json({ message: "Too many requests. Please try again later." });
   }
   next();
@@ -570,11 +584,39 @@ app.get("/api/admin/waitlist", adminAuth, async (req, res) => {
 
 app.put("/api/admin/waitlist/:id", adminAuth, async (req, res) => {
   try {
-    const { name, phone, model, preorder, status } = req.body;
-    await Waitlist.findByIdAndUpdate(req.params.id, { name, phone, model, preorder, status });
-    res.json({ message: "Updated" });
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid waitlist ID" });
+    }
+    const body = req.body || {};
+    const allowedFields = ["name", "phone", "model", "preorder", "status"];
+    const updates = Object.fromEntries(
+      Object.entries(body).filter(([key]) => allowedFields.includes(key))
+    );
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No valid fields provided" });
+    }
+    if (updates.name !== undefined && (typeof updates.name !== "string" || !updates.name.trim() || updates.name.length > 100)) {
+      return res.status(400).json({ message: "Invalid name" });
+    }
+    if (updates.phone !== undefined && (typeof updates.phone !== "string" || updates.phone.length > 30)) {
+      return res.status(400).json({ message: "Invalid phone number" });
+    }
+    if (updates.model !== undefined && !["5am", "founder", "midnight"].includes(updates.model)) {
+      return res.status(400).json({ message: "Invalid model" });
+    }
+    if (updates.preorder !== undefined && !["yes", "maybe", "no"].includes(updates.preorder)) {
+      return res.status(400).json({ message: "Invalid preorder value" });
+    }
+    if (updates.status !== undefined && !["pending", "fulfilled"].includes(updates.status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    if (updates.name !== undefined) updates.name = updates.name.trim();
+    const updated = await Waitlist.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true }).select("-password");
+    if (!updated) return res.status(404).json({ message: "Waitlist entry not found" });
+    res.json({ message: "Updated", entry: updated });
   } catch (err) {
-    res.status(500).json({ message: "Update failed" });
+    console.error("Admin waitlist update failed:", err.message);
+    res.status(400).json({ message: "Update failed; check the supplied values" });
   }
 });
 
