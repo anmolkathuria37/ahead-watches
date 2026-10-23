@@ -147,7 +147,7 @@ export default function HeroSection() {
           initial="hidden"
           animate="show"
           className="font-display text-7xl sm:text-8xl md:text-9xl font-bold tracking-[0.08em] uppercase mb-2 select-none"
-          aria-label="AHED Watches"
+          aria-label="AHEAD Watches"
         >
           <motion.span
             variants={brandLetter}
@@ -156,7 +156,7 @@ export default function HeroSection() {
             A
           </motion.span>
 
-          {"HED".split("").map((char, i) => (
+          {"HEAD".split("").map((char, i) => (
             <motion.span
               key={i}
               variants={brandLetter}

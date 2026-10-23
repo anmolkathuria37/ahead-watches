@@ -67,8 +67,12 @@ const WaitlistSection = () => {
 
     if (loading) return;
 
-    if (!form.name || !form.email || !form.model || !form.preorder) {
-      toast.error("Please fill all fields");
+    if (!form.name.trim() || !form.phone.trim() || !form.email.trim() || !form.model || !form.preorder) {
+      toast.error("Please complete every field, including your phone number.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      toast.error("Please enter a valid email address.");
       return;
     }
 
@@ -90,11 +94,14 @@ const WaitlistSection = () => {
         return;
       }
 
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "We couldn't submit your request. Please try again.");
+      }
 
       setSubmitted(true);
-    } catch {
-      toast.error("Something went wrong");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -157,6 +164,9 @@ const WaitlistSection = () => {
           <input
             type="text"
             placeholder="Full Name"
+            aria-label="Full name"
+            autoComplete="name"
+            required
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             className="w-full bg-input border border-border rounded-sm px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all"
@@ -166,6 +176,10 @@ const WaitlistSection = () => {
           <input
             type="tel"
             placeholder="Phone Number (with country code)"
+            aria-label="Phone number with country code"
+            autoComplete="tel"
+            required
+            maxLength={30}
             value={form.phone || ""}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
             className="w-full bg-input border border-border rounded-sm px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all"
@@ -174,12 +188,17 @@ const WaitlistSection = () => {
           <input
             type="email"
             placeholder="Email Address"
+            aria-label="Email address"
+            autoComplete="email"
+            required
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             className="w-full bg-input border border-border rounded-sm px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all"
             maxLength={255}
           />
           <select
+            aria-label="Preferred watch model"
+            required
             value={form.model}
             onChange={(e) => setForm({ ...form, model: e.target.value })}
             className="w-full bg-input border border-border rounded-sm px-4 py-3 text-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all appearance-none"
@@ -192,6 +211,8 @@ const WaitlistSection = () => {
             <option value="midnight">Midnight Discipline</option>
           </select>
           <select
+            aria-label="Pre-order interest"
+            required
             value={form.preorder}
             onChange={(e) => setForm({ ...form, preorder: e.target.value })}
             className="w-full bg-input border border-border rounded-sm px-4 py-3 text-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all appearance-none"

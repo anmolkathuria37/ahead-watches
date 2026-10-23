@@ -18,15 +18,26 @@ app.disable("x-powered-by");
 /* =======================
    Global Middlewares
 ======================= */
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-  : ["*"];
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = configuredOrigins.length
+  ? configuredOrigins
+  : process.env.NODE_ENV === "production"
+    ? []
+    : ["http://localhost:8080", "http://127.0.0.1:8080"];
+
+if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
+  console.error("ALLOWED_ORIGINS must be configured in production; cross-origin browser requests will be denied.");
+}
 
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error("Not allowed by CORS"));
+      // Non-browser/server-to-server requests may not send an Origin header.
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error("Origin not allowed by CORS"));
     },
     credentials: true,
   })
@@ -64,7 +75,16 @@ const rateLimit = (windowMs, maxRequests) => (req, res, next) => {
   hits.push(now);
   rateLimitMap.set(key, hits);
 
+  // Bound memory use if clients rotate IPs or paths.
+  if (rateLimitMap.size > 10000) {
+    for (const [entryKey, entryHits] of rateLimitMap) {
+      if (!entryHits.some((timestamp) => timestamp > now - windowMs)) rateLimitMap.delete(entryKey);
+      if (rateLimitMap.size <= 9000) break;
+    }
+  }
+
   if (hits.length > maxRequests) {
+    res.setHeader("Retry-After", String(Math.ceil(windowMs / 1000)));
     return res.status(429).json({ message: "Too many requests. Please try again later." });
   }
   next();
@@ -229,7 +249,7 @@ const sendConfirmation = async (email, name, model) => {
           
           <!-- Main Content -->
           <div style="padding:0 40px;">
-            <h2 style="color:#e0e0ec; font-size:22px; font-weight:400; margin:0 0 16px;">Congratulations, ${name}.</h2>
+            <h2 style="color:#e0e0ec; font-size:22px; font-weight:400; margin:0 0 16px;">Congratulations, ${escapeHtml(name)}.</h2>
             <p style="font-size:15px; line-height:1.8; color:#8888a0; margin:0 0 24px;">
               You've secured your exclusive position on the AHEAD waitlist. Welcome to a community of visionaries who understand that time is the ultimate luxury.
             </p>
@@ -273,17 +293,17 @@ const sendPasswordEmail = async (email, name, password) => {
     html: `
       <div style="font-family:'Helvetica Neue',Arial,sans-serif; padding:0; margin:0; background:#07070d;">
         <div style="max-width:600px; margin:0 auto; background:linear-gradient(180deg, #0c0c16 0%, #10101c 100%); padding:48px 40px;">
-          <h1 style="color:#d0d0dc; font-size:28px; margin:0 0 8px; font-weight:400;">Welcome, ${name}</h1>
+          <h1 style="color:#d0d0dc; font-size:28px; margin:0 0 8px; font-weight:400;">Welcome, ${escapeHtml(name)}</h1>
           <p style="color:#606078; font-size:13px; margin:0 0 32px;">Your personal dashboard is ready.</p>
           
           <div style="background:#0a0a14; border:1px solid #1a1a2a; border-radius:8px; padding:24px;">
             <p style="color:#505068; font-size:10px; letter-spacing:4px; text-transform:uppercase; margin:0 0 16px;">Login Credentials</p>
             
             <p style="color:#606078; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin:0 0 4px;">Email</p>
-            <p style="color:#d0d0dc; font-size:15px; margin:0 0 20px;">${email}</p>
+            <p style="color:#d0d0dc; font-size:15px; margin:0 0 20px;">${escapeHtml(email)}</p>
             
             <p style="color:#606078; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin:0 0 4px;">Password</p>
-            <p style="color:#d0d0dc; font-size:16px; margin:0; font-family:monospace; letter-spacing:2px; background:#0e0e18; padding:8px 12px; border-radius:4px; border:1px solid #1a1a28; display:inline-block;">${password}</p>
+            <p style="color:#d0d0dc; font-size:16px; margin:0; font-family:monospace; letter-spacing:2px; background:#0e0e18; padding:8px 12px; border-radius:4px; border:1px solid #1a1a28; display:inline-block;">${escapeHtml(password)}</p>
           </div>
           
           <p style="color:#404058; font-size:12px; margin:24px 0 0;">Keep these credentials secure. Do not share them.</p>
@@ -299,15 +319,15 @@ const sendGrievanceNotification = async (userName, userEmail, subject, message) 
   await sendMailWithRetry({
     from: `"AHEAD System" <${process.env.EMAIL_USER}>`,
     to: process.env.ADMIN_EMAIL,
-    subject: `[Grievance] ${subject} — from ${userName}`,
+    subject: `[Grievance] ${escapeHtml(subject)} — from ${escapeHtml(userName)}`,
     html: `
       <div style="font-family:'Helvetica Neue',Arial,sans-serif; padding:24px; background:#07070d;">
         <div style="max-width:600px; margin:0 auto; background:#0c0c16; padding:32px; border-radius:8px; border:1px solid #1a1a2a;">
           <h2 style="color:#d0d0dc; font-size:18px; margin:0 0 16px;">New Grievance Received</h2>
-          <p style="color:#8888a0; font-size:14px; margin:0 0 8px;"><strong style="color:#b0b0c0;">From:</strong> ${userName} (${userEmail})</p>
-          <p style="color:#8888a0; font-size:14px; margin:0 0 8px;"><strong style="color:#b0b0c0;">Subject:</strong> ${subject}</p>
+          <p style="color:#8888a0; font-size:14px; margin:0 0 8px;"><strong style="color:#b0b0c0;">From:</strong> ${escapeHtml(userName)} (${escapeHtml(userEmail)})</p>
+          <p style="color:#8888a0; font-size:14px; margin:0 0 8px;"><strong style="color:#b0b0c0;">Subject:</strong> ${escapeHtml(subject)}</p>
           <div style="margin:16px 0; padding:16px; background:#0a0a14; border-left:3px solid #404060; border-radius:4px;">
-            <p style="color:#8888a0; font-size:14px; line-height:1.7; margin:0;">${message}</p>
+            <p style="color:#8888a0; font-size:14px; line-height:1.7; margin:0;">${escapeHtml(message)}</p>
           </div>
         </div>
       </div>
@@ -321,7 +341,7 @@ const sendWhatsAppConfirmation = async ({ phone, name }) => {
     await twilioClient.messages.create({
       from: process.env.TWILIO_WHATSAPP_NUMBER,
       to: `whatsapp:${phone}`,
-      body: `Hi ${name}, you're officially on the AHEAD Watches waitlist! ⌚ — The choice of a founder.`,
+      body: `Hi ${escapeHtml(name)}, you're officially on the AHEAD Watches waitlist! ⌚ — The choice of a founder.`,
     });
     console.log("💬 WhatsApp sent to:", phone);
   } catch (err) {
@@ -334,7 +354,35 @@ const sendWhatsAppConfirmation = async ({ phone, name }) => {
 ======================= */
 const sanitize = (str) => {
   if (typeof str !== "string") return "";
-  return str.replace(/[<>]/g, "").trim();
+  return str.trim();
+};
+
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[char]);
+
+const hashPassword = (password) =>
+  new Promise((resolve, reject) => {
+    const salt = crypto.randomBytes(16).toString("hex");
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
+      if (err) return reject(err);
+      resolve(`scrypt${salt}${derivedKey.toString("hex")}`);
+    });
+  });
+
+const verifyPassword = async (password, storedPassword) => {
+  if (typeof storedPassword !== "string") return false;
+  if (!storedPassword.startsWith("scrypt$")) {
+    if (!storedPassword.length || password.length !== storedPassword.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(password), Buffer.from(storedPassword));
+  }
+  const [, salt, expectedHex] = storedPassword.split("$");
+  if (!salt || !expectedHex || !/^[a-f0-9]{128}$/i.test(expectedHex)) return false;
+  const actual = await new Promise((resolve, reject) =>
+    crypto.scrypt(password, salt, 64, (err, key) => err ? reject(err) : resolve(key))
+  );
+  return crypto.timingSafeEqual(Buffer.from(expectedHex, "hex"), actual);
 };
 
 /* =======================
@@ -364,9 +412,10 @@ app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
       return res.status(400).json({ message: "Invalid preorder value" });
     }
 
-    const password = crypto.randomBytes(4).toString("hex");
+    const password = crypto.randomBytes(24).toString("hex");
+    const passwordHash = await hashPassword(password);
 
-    await Waitlist.create({ name, phone, email, model, preorder, password });
+    await Waitlist.create({ name, phone, email, model, preorder, password: passwordHash });
 
     // Send confirmations (non-blocking)
     sendConfirmation(email, name, model);
@@ -394,7 +443,18 @@ app.post("/api/user/login", rateLimit(60000, 10), async (req, res) => {
 
     const user = await Waitlist.findOne({ email });
     if (!user) return res.status(404).json({ message: "Email not found on waitlist" });
-    if (user.password !== password) return res.status(401).json({ message: "Invalid password" });
+    let passwordMatches = false;
+    try {
+      passwordMatches = await verifyPassword(password, user.password);
+    } catch {
+      passwordMatches = false;
+    }
+    if (!passwordMatches) return res.status(401).json({ message: "Invalid credentials" });
+
+    if (!user.password.startsWith("scrypt$")) {
+      user.password = await hashPassword(password);
+      await user.save();
+    }
 
     const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
     return res.json({ token });
@@ -524,11 +584,39 @@ app.get("/api/admin/waitlist", adminAuth, async (req, res) => {
 
 app.put("/api/admin/waitlist/:id", adminAuth, async (req, res) => {
   try {
-    const { name, phone, model, preorder, status } = req.body;
-    await Waitlist.findByIdAndUpdate(req.params.id, { name, phone, model, preorder, status });
-    res.json({ message: "Updated" });
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid waitlist ID" });
+    }
+    const body = req.body || {};
+    const allowedFields = ["name", "phone", "model", "preorder", "status"];
+    const updates = Object.fromEntries(
+      Object.entries(body).filter(([key]) => allowedFields.includes(key))
+    );
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No valid fields provided" });
+    }
+    if (updates.name !== undefined && (typeof updates.name !== "string" || !updates.name.trim() || updates.name.length > 100)) {
+      return res.status(400).json({ message: "Invalid name" });
+    }
+    if (updates.phone !== undefined && (typeof updates.phone !== "string" || updates.phone.length > 30)) {
+      return res.status(400).json({ message: "Invalid phone number" });
+    }
+    if (updates.model !== undefined && !["5am", "founder", "midnight"].includes(updates.model)) {
+      return res.status(400).json({ message: "Invalid model" });
+    }
+    if (updates.preorder !== undefined && !["yes", "maybe", "no"].includes(updates.preorder)) {
+      return res.status(400).json({ message: "Invalid preorder value" });
+    }
+    if (updates.status !== undefined && !["pending", "fulfilled"].includes(updates.status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    if (updates.name !== undefined) updates.name = updates.name.trim();
+    const updated = await Waitlist.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true }).select("-password");
+    if (!updated) return res.status(404).json({ message: "Waitlist entry not found" });
+    res.json({ message: "Updated", entry: updated });
   } catch (err) {
-    res.status(500).json({ message: "Update failed" });
+    console.error("Admin waitlist update failed:", err.message);
+    res.status(400).json({ message: "Update failed; check the supplied values" });
   }
 });
 
@@ -579,10 +667,16 @@ app.post("/api/chat", rateLimit(60000, 20), async (req, res) => {
       return res.status(500).json({ message: "Chatbot is not configured. Missing GEMINI_API_KEY." });
     }
 
-    const contents = messages.slice(-12).map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: String(m.content || "").slice(0, 2000) }],
-    }));
+    const contents = messages
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .slice(-12)
+      .map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content.slice(0, 2000) }],
+      }));
+    if (contents.length === 0) {
+      return res.status(400).json({ message: "No valid messages provided" });
+    }
 
     const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
