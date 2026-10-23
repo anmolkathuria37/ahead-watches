@@ -1,5 +1,6 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
+import { ArrowUpRight, Check } from "lucide-react";
 import watch5am from "@/assets/watch-5am.jpg";
 import watchFounder from "@/assets/watch-founder.jpg";
 import watchMidnight from "@/assets/watch-midnight.jpg";
@@ -7,107 +8,117 @@ import watchMidnight from "@/assets/watch-midnight.jpg";
 const watches = [
   {
     name: "5:00 AM Edition",
-    description: "Matte black dial. Minimal. Disciplined.",
+    descriptor: "For the ones already moving.",
+    description: "A restrained matte-black dial built around focus, consistency, and the quiet work no one sees.",
     price: "₹4,999",
     image: watch5am,
-    specs: ["42mm case", "Japanese Quartz", "5ATM"],
+    label: "THE DISCIPLINED",
+    specs: ["42 mm case", "Japanese quartz", "5 ATM"],
   },
   {
-    name: "Founder's Steel",
-    description: "Silver casing. White dial. Authority.",
+    name: "Founder’s Steel",
+    descriptor: "Make every second count.",
+    description: "A crisp silver finish and clean white dial: understated presence for people building what comes next.",
     price: "₹5,999",
     image: watchFounder,
-    specs: ["40mm case", "Swiss Quartz", "10ATM"],
+    label: "THE ORIGINAL",
+    specs: ["40 mm case", "Swiss quartz", "10 ATM"],
   },
   {
     name: "Midnight Discipline",
-    description: "Deep navy dial. Steel precision.",
+    descriptor: "Calm under pressure.",
+    description: "Deep navy tones meet a steel silhouette, made for late nights and early starts alike.",
     price: "₹5,499",
     image: watchMidnight,
-    specs: ["44mm case", "Japanese Quartz", "Luminous"],
+    label: "THE NIGHT OWL",
+    specs: ["44 mm case", "Japanese quartz", "Luminous"],
   },
 ];
 
 const ProductShowcase = () => {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section id="collection" className="py-32 px-6 bg-gradient-dark">
-      <div className="max-w-6xl mx-auto">
+    <section id="collection" ref={ref} className="relative overflow-hidden bg-gradient-dark px-5 py-24 sm:px-8 sm:py-32">
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-steel/40 to-transparent" />
+      <div className="mx-auto max-w-7xl">
         <motion.div
-          ref={ref}
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-20"
+          transition={{ duration: 0.7 }}
+          className="mb-12 flex flex-col gap-6 md:mb-16 md:flex-row md:items-end md:justify-between"
         >
-          <p className="text-steel-dark text-sm tracking-[0.3em] uppercase mb-4 font-medium">
-            The Collection
+          <div className="max-w-2xl">
+            <p className="mb-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.32em] text-steel-light/70">
+              <span className="h-px w-8 bg-steel/70" />
+              Designed with intent
+            </p>
+            <h2 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight text-foreground sm:text-5xl md:text-6xl">
+              The Early <span className="text-gradient-steel">Series.</span>
+            </h2>
+          </div>
+          <p className="max-w-md text-sm leading-7 text-muted-foreground sm:text-base">
+            Three expressions of the same belief: your time should reflect the person you’re becoming.
           </p>
-          <h2 className="font-display text-3xl md:text-5xl font-bold text-gradient-steel tracking-tight">
-            The Early Series
-          </h2>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid gap-5 md:grid-cols-3 md:gap-6">
           {watches.map((watch, i) => (
-            <motion.div
+            <motion.article
               key={watch.name}
-              initial={{ opacity: 0, y: 40 }}
+              initial={{ opacity: 0, y: 28 }}
               animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.7, delay: 0.2 * i }}
-              className="group relative rounded-lg border border-border/50 bg-card/40 backdrop-blur-xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:border-steel/30 hover:shadow-[0_8px_40px_rgba(100,110,140,0.15)] hover:-translate-y-2 transition-all duration-500"
+              transition={{ duration: 0.65, delay: i * 0.12 }}
+              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] transition-colors duration-500 hover:border-steel/40 hover:bg-white/[0.045]"
             >
-              {/* Glass shimmer */}
-              <div className="absolute inset-0 bg-gradient-to-br from-steel-light/5 via-transparent to-transparent pointer-events-none z-10" />
-
-              <div className="aspect-square overflow-hidden bg-background relative">
+              <div className="relative aspect-[4/4.5] overflow-hidden bg-secondary/40">
                 <img
                   src={watch.image}
                   alt={watch.name}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.045]"
                   loading="lazy"
                 />
-                {/* Overlay on hover */}
-                <div className="absolute inset-0 bg-background/0 group-hover:bg-background/20 transition-all duration-500" />
+                <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/10" />
+                <span className="absolute left-5 top-5 rounded-full border border-white/20 bg-background/55 px-3 py-1.5 text-[10px] font-semibold tracking-[0.2em] text-foreground/90 backdrop-blur-md">
+                  {watch.label}
+                </span>
+                <span className="absolute bottom-5 left-5 font-display text-2xl font-medium tracking-tight text-white sm:text-3xl">
+                  {watch.price}
+                </span>
               </div>
 
-              <div className="p-6 relative z-10">
-                <h3 className="font-display text-xl font-semibold text-foreground mb-1">
-                  {watch.name}
-                </h3>
-                <p className="text-muted-foreground text-sm mb-3 font-light">
-                  {watch.description}
+              <div className="p-5 sm:p-6">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-steel-light/65">
+                  {watch.descriptor}
                 </p>
+                <h3 className="font-display text-xl font-semibold text-foreground sm:text-2xl">{watch.name}</h3>
+                <p className="mt-3 min-h-[4.5rem] text-sm leading-6 text-muted-foreground">{watch.description}</p>
 
-                {/* Specs pills */}
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="my-5 flex flex-wrap gap-x-4 gap-y-2 border-y border-white/10 py-4">
                   {watch.specs.map((spec) => (
-                    <span
-                      key={spec}
-                      className="text-[10px] tracking-wider uppercase px-2 py-1 rounded-full bg-secondary/50 text-muted-foreground border border-border/30"
-                    >
+                    <span key={spec} className="inline-flex items-center gap-1.5 text-[11px] text-foreground/75">
+                      <Check aria-hidden="true" className="h-3.5 w-3.5 text-steel-light/70" />
                       {spec}
                     </span>
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-steel-light text-sm font-medium">
-                    Expected: {watch.price}
-                  </span>
-                </div>
                 <a
                   href="#waitlist"
-                  className="block text-center w-full bg-gradient-steel text-primary-foreground py-2.5 text-xs tracking-widest uppercase font-semibold rounded-sm hover:opacity-90 transition-all duration-300"
+                  aria-label={`Join the waitlist for ${watch.name}`}
+                  className="group/cta inline-flex min-h-11 w-full items-center justify-between rounded-lg border border-white/15 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-all duration-300 hover:border-steel/60 hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-steel"
                 >
-                  Join Waitlist
+                  <span>Get early access</span>
+                  <ArrowUpRight aria-hidden="true" className="h-4 w-4 transition-transform duration-300 group-hover/cta:-translate-y-0.5 group-hover/cta:translate-x-0.5" />
                 </a>
               </div>
-            </motion.div>
+            </motion.article>
           ))}
         </div>
+        <p className="mt-6 text-center text-xs leading-5 text-muted-foreground/70">
+          Prices shown are expected prices and may change before release.
+        </p>
       </div>
     </section>
   );
