@@ -153,7 +153,7 @@ const WaitlistSection = () => {
             </div>
 
             <p className="text-xs leading-5 text-muted-foreground">No payment required. We’ll only use these details for AHEAD early-access updates.</p>
-            <button type="submit" disabled={loading} className="group flex min-h-13 w-full items-center justify-between rounded-lg bg-gradient-steel px-5 py-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary-foreground shadow-[0_12px_30px_-15px_rgba(200,190,165,0.6)] transition duration-300 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-steel disabled:cursor-not-allowed disabled:opacity-55">
+            <button type="submit" disabled={loading} className="group flex min-h-12 w-full items-center justify-between rounded-lg bg-gradient-steel px-5 py-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary-foreground shadow-[0_12px_30px_-15px_rgba(200,190,165,0.6)] transition duration-300 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-steel disabled:cursor-not-allowed disabled:opacity-55">
               <span>{loading ? "Saving your place…" : "Secure my early access"}</span>
               <span aria-hidden="true" className="transition-transform group-hover:translate-x-1">↗</span>
             </button>
