@@ -1,248 +1,51 @@
-// import { motion } from "framer-motion";
-// import heroWatch from "@/assets/hero-watch.jpg";
-
-// const HeroSection = () => {
-//   return (
-//     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-//       {/* Hero background image */}
-//       <div className="absolute inset-0">
-//         <img
-//           src={heroWatch}
-//           alt=""
-//           className="w-full h-full object-cover object-center"
-//           aria-hidden="true"
-//         />
-//         <div className="absolute inset-0 bg-background/60" />
-//         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-background/20" />
-//       </div>
-
-//       <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
-//         {/* Brand Name */}
-//         <motion.h1
-//           initial={{ opacity: 0, scale: 0.9 }}
-//           animate={{ opacity: 1, scale: 1 }}
-//           transition={{ duration: 1.2, ease: "easeOut" }}
-//           className="font-display text-7xl sm:text-8xl md:text-9xl font-bold tracking-[0.08em] uppercase mb-2 hero-brand-text select-none"
-//           aria-label="AHEAD Watches"
-//         >
-//           <span className="inline-block italic" style={{ fontStyle: 'italic' }}>A</span>
-//           <span>HEAD</span>
-//         </motion.h1>
-
-//         <motion.p
-//           initial={{ opacity: 0 }}
-//           animate={{ opacity: 1 }}
-//           transition={{ duration: 0.8, delay: 0.6 }}
-//           className="font-display text-base sm:text-lg md:text-xl tracking-[0.35em] uppercase text-steel-light/70 font-medium mb-10"
-//         >
-//           Watches
-//         </motion.p>
-
-//         {/* Tagline with decorative lines */}
-//         <motion.div
-//           initial={{ opacity: 0, y: 10 }}
-//           animate={{ opacity: 1, y: 0 }}
-//           transition={{ duration: 0.8, delay: 0.9 }}
-//           className="flex items-center justify-center gap-4 md:gap-6 mb-14"
-//         >
-//           <div className="h-px w-10 md:w-20 bg-gradient-to-r from-transparent to-steel" />
-//           <p className="text-sm sm:text-base md:text-lg tracking-[0.4em] uppercase text-steel-light font-medium drop-shadow-[0_0_12px_hsl(220_20%_70%/0.5)] whitespace-nowrap">
-//             Be Ahead Of Time
-//           </p>
-//           <div className="h-px w-10 md:w-20 bg-gradient-to-l from-transparent to-steel" />
-//         </motion.div>
-
-//         <motion.p
-//           initial={{ opacity: 0, y: 20 }}
-//           animate={{ opacity: 1, y: 0 }}
-//           transition={{ duration: 0.8, delay: 1.2 }}
-//           className="text-muted-foreground text-lg md:text-xl tracking-wide max-w-xl mx-auto mb-12 font-light"
-//         >
-//           Worn by the ambitious. Built for the early movers.
-//         </motion.p>
-
-//         <motion.div
-//           initial={{ opacity: 0, y: 20 }}
-//           animate={{ opacity: 1, y: 0 }}
-//           transition={{ duration: 0.8, delay: 1.5 }}
-//           className="flex flex-col sm:flex-row gap-4 justify-center"
-//         >
-//           <a
-//             href="#waitlist"
-//             className="bg-gradient-steel text-primary-foreground px-8 py-3.5 text-sm font-semibold tracking-widest uppercase rounded-sm hover:opacity-90 transition-all duration-300 hover:shadow-[0_0_30px_-5px_hsl(220_20%_60%/0.3)]"
-//           >
-//             Apply For Founder Access
-//           </a>
-//           <a
-//             href="#collection"
-//             className="border border-border text-foreground px-8 py-3.5 text-sm font-semibold tracking-widest uppercase rounded-sm hover:bg-secondary transition-all duration-300"
-//           >
-//             Explore The Early Series
-//           </a>
-//         </motion.div>
-//       </div>
-
-//       {/* Bottom fade */}
-//       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
-//     </section>
-//   );
-// };
-
-// export default HeroSection;
-
-
-
-
 import { motion } from "framer-motion";
-import heroWatch from "@/assets/hero-watch.jpg";
 
 const brandContainer = {
   hidden: {},
-  show: {
-    transition: {
-      staggerChildren: 0.06,   // tighter, more premium
-      delayChildren: 0.15,
-    },
-  },
+  show: { transition: { staggerChildren: 0.06, delayChildren: 0.15 } },
 };
-
 const brandLetter = {
-  hidden: {
-    opacity: 0,
-    y: 28,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.8,
-      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
-    },
-  },
+  hidden: { opacity: 0, y: 28 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
 };
-
 
 export default function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-
-      {/* Background */}
+    <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-[#080A0E]">
       <div className="absolute inset-0">
         <img
-          src={heroWatch}
+          src="https://images.unsplash.com/photo-1523170335258-f5ed11844a49?auto=format&fit=crop&w=2400&q=90"
           alt=""
-          className="w-full h-full object-cover object-center"
+          className="h-full w-full object-cover object-center opacity-80"
           aria-hidden="true"
+          fetchPriority="high"
         />
-        <div className="absolute inset-0 bg-background/60" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-background/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#080A0E]/95 via-[#080A0E]/55 to-[#080A0E]/15" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080A0E] via-transparent to-[#080A0E]/35" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_42%,rgba(201,181,141,0.12),transparent_44%)]" />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
-
-        {/* BRAND NAME */}
-        <motion.h1
-          variants={brandContainer}
-          initial="hidden"
-          animate="show"
-          className="font-display text-7xl sm:text-8xl md:text-9xl font-bold tracking-[0.08em] uppercase mb-2 select-none"
-          aria-label="AHEAD Watches"
-        >
-          <motion.span
-            variants={brandLetter}
-            className="inline-block italic mr-1 "
-          >
-            A
-          </motion.span>
-
-          {"HEAD".split("").map((char, i) => (
-            <motion.span
-              key={i}
-              variants={brandLetter}
-              className="inline-block "
-            >
-              {char}
-            </motion.span>
-          ))}
-        </motion.h1>
-
-        {/* SUB BRAND */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.7 }}
-          className="font-display text-base sm:text-lg tracking-[0.35em] uppercase text-steel-light/70 font-medium mb-10"
-        >
-          Watches
-        </motion.p>
-
-        {/* TAGLINE */}
-        <motion.div
-          initial="hidden"
-          animate="show"
-          className="flex items-center justify-center gap-4 md:gap-6 mb-14"
-        >
-          <motion.div
-            initial={{ scaleX: 0, opacity: 0 }}
-            animate={{ scaleX: 1, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 1 }}
-            className="origin-right h-px w-10 md:w-20 bg-gradient-to-r from-transparent to-steel"
-          />
-
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.15 }}
-            className="text-sm sm:text-base md:text-lg tracking-[0.4em] uppercase text-steel-light font-medium whitespace-nowrap"
-          >
-            Be Ahead Of Time
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-16 pt-32 sm:px-10 lg:pt-36">
+        <div className="max-w-3xl">
+          <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }} className="mb-7 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.36em] text-[#C9B58D] sm:text-xs">
+            <span className="h-px w-10 bg-[#C9B58D]" /> Independent watchmaking · A new point of view
           </motion.p>
-
-          <motion.div
-            initial={{ scaleX: 0, opacity: 0 }}
-            animate={{ scaleX: 1, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 1 }}
-            className="origin-left h-px w-10 md:w-20 bg-gradient-to-l from-transparent to-steel"
-          />
-        </motion.div>
-
-        {/* SUPPORTING COPY */}
-        <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.4 }}
-          className="text-muted-foreground text-lg md:text-xl tracking-wide max-w-xl mx-auto mb-12 font-light"
-        >
-          Worn by the ambitious. Built for the early movers.
-        </motion.p>
-
-        {/* CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.6 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center"
-        >
-          <a
-            href="#waitlist"
-            className="bg-gradient-steel text-primary-foreground px-8 py-3.5 text-sm font-semibold tracking-widest uppercase rounded-sm hover:opacity-90 transition-all duration-300 hover:shadow-[0_0_30px_-5px_hsl(220_20%_60%/0.3)]"
-          >
-            Apply For Founder Access
-          </a>
-
-          <a
-            href="#collection"
-            className="border border-border text-foreground px-8 py-3.5 text-sm font-semibold tracking-widest uppercase rounded-sm hover:bg-secondary transition-all duration-300"
-          >
-            Explore The Early Series
-          </a>
-        </motion.div>
-
+          <motion.h1 variants={brandContainer} initial="hidden" animate="show" className="select-none font-display text-6xl font-semibold uppercase leading-[0.9] tracking-[0.06em] text-[#E8E6E0] sm:text-8xl md:text-9xl" aria-label="AHEAD Watches">
+            {"AHEAD".split("").map((char, index) => <motion.span key={index} variants={brandLetter} className={index === 0 ? "inline-block text-[#C9B58D]" : "inline-block"}>{char}</motion.span>)}
+          </motion.h1>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.65 }} className="mt-5 font-display text-xs font-medium uppercase tracking-[0.45em] text-white/65 sm:text-sm">Watches</motion.p>
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.8 }} className="mt-9 max-w-xl border-l border-[#C9B58D]/65 pl-5 sm:mt-12 sm:pl-7">
+            <p className="font-display text-2xl leading-snug tracking-tight text-[#E8E6E0] sm:text-3xl md:text-4xl">Be ahead of time.</p>
+            <p className="mt-4 max-w-md text-sm leading-7 text-white/65 sm:text-base">Worn by the ambitious. Built for the early movers. Discover the ideas behind the first AHEAD collection.</p>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 1 }} className="mt-9 flex flex-col gap-3 sm:mt-11 sm:flex-row">
+            <a href="#collection" className="inline-flex min-h-12 items-center justify-center gap-3 rounded-md bg-[#C9B58D] px-7 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[#080A0E] transition hover:bg-[#E1D0AA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#C9B58D]">Explore the collection <span aria-hidden="true">↗</span></a>
+            <a href="#waitlist" className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/25 bg-white/[0.035] px-7 py-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-white transition hover:border-[#C9B58D]/70 hover:bg-white/[0.07] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#C9B58D]">Request early access</a>
+          </motion.div>
+        </div>
+        <div className="mt-16 flex items-center gap-3 text-[9px] uppercase tracking-[0.22em] text-white/40 sm:mt-20"><span className="h-px w-8 bg-[#C9B58D]/60" /> Thoughtful design. Time, redefined.</div>
       </div>
-
-      {/* Bottom fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
+      <div aria-hidden="true" className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-[#080A0E] to-transparent" />
     </section>
   );
 }

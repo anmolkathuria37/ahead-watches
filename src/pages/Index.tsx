@@ -20,7 +20,7 @@ const Index = () => {
         <CinematicVideo />
         <PhilosophySection />
         <ProductShowcase />
-        <Suspense fallback={<div className="h-[500px] flex items-center justify-center text-muted-foreground text-sm animate-pulse">Loading 3D Experience...</div>}>
+        <Suspense fallback={<div className="h-[500px] flex items-center justify-center text-muted-foreground text-sm animate-pulse">Loading AHEAD design study...</div>}>
           <Watch3D />
         </Suspense>
         <FounderDrop />

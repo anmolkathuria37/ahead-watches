@@ -1,239 +1,138 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, ContactShadows, Float } from "@react-three/drei";
-import { useRef, Suspense } from "react";
-import * as THREE from "three";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 
-function WatchModel() {
-  const groupRef = useRef<THREE.Group>(null);
+const concepts = [
+  {
+    modelId: "5am",
+    name: "5:00 AM Edition",
+    edition: "The discipline concept",
+    image: "https://www.watchesofswitzerland.com/cdn/shop/files/18100268_1.jpg?height=1600&v=1745258611&width=1600",
+    alt: "Temporary visual reference for the 5:00 AM Edition concept",
+    description:
+      "A restrained dark-dial concept for early starts and deliberate momentum. Quiet detailing, confident proportions, and a design language built around discipline.",
+    mood: "Focus · Restraint · Momentum",
+  },
+  {
+    modelId: "founder",
+    name: "Founder’s Steel",
+    edition: "The ambition concept",
+    image: "https://cdn.thewatchpages.com/app/uploads/2020/03/13214504/jacob-co-astronomia-tourbillon-at10040acsda.jpg",
+    alt: "Temporary visual reference for the Founder’s Steel concept",
+    description:
+      "A polished steel-and-light concept for people building what comes next. Balanced, architectural, and deliberately understated—with presence that never needs to announce itself.",
+    mood: "Clarity · Craft · Ambition",
+  },
+  {
+    modelId: "midnight",
+    name: "Midnight Discipline",
+    edition: "The after-hours concept",
+    image: "https://www.europastar.com/local/cache-vignettes/L1400xH1653/jacob.co-7d78f.jpg",
+    alt: "Temporary visual reference for the Midnight Discipline concept",
+    description:
+      "A deep, nocturnal concept with a bold silhouette and composed presence—made to move from late-night focus to first light without losing its edge.",
+    mood: "Depth · Composure · Precision",
+  },
+];
 
-  useFrame((state) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = state.clock.elapsedTime * 0.15;
-      groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.05;
-    }
-  });
-
-  return (
-    <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.3}>
-      <group ref={groupRef} scale={1.2}>
-        {/* Watch case - main body */}
-        <mesh position={[0, 0, 0]} castShadow>
-          <cylinderGeometry args={[1.1, 1.1, 0.35, 64]} />
-          <meshStandardMaterial
-            color="#2a2a30"
-            metalness={0.95}
-            roughness={0.1}
-            envMapIntensity={1.5}
-          />
-        </mesh>
-
-        {/* Watch case - bezel ring */}
-        <mesh position={[0, 0.18, 0]}>
-          <torusGeometry args={[1.05, 0.06, 16, 64]} />
-          <meshStandardMaterial
-            color="#c0c0cc"
-            metalness={1}
-            roughness={0.05}
-            envMapIntensity={2}
-          />
-        </mesh>
-        <mesh position={[0, -0.18, 0]}>
-          <torusGeometry args={[1.05, 0.06, 16, 64]} />
-          <meshStandardMaterial
-            color="#c0c0cc"
-            metalness={1}
-            roughness={0.05}
-            envMapIntensity={2}
-          />
-        </mesh>
-
-        {/* Watch dial / face */}
-        <mesh position={[0, 0.181, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.95, 64]} />
-          <meshStandardMaterial
-            color="#0a0a12"
-            metalness={0.3}
-            roughness={0.4}
-          />
-        </mesh>
-
-        {/* Hour markers */}
-        {Array.from({ length: 12 }).map((_, i) => {
-          const angle = (i / 12) * Math.PI * 2;
-          const r = 0.78;
-          const isMain = i % 3 === 0;
-          return (
-            <mesh
-              key={i}
-              position={[
-                Math.sin(angle) * r,
-                0.185,
-                Math.cos(angle) * r,
-              ]}
-              rotation={[-Math.PI / 2, 0, 0]}
-            >
-              <boxGeometry args={[isMain ? 0.06 : 0.03, isMain ? 0.14 : 0.08, 0.01]} />
-              <meshStandardMaterial
-                color="#e0e0e8"
-                metalness={0.9}
-                roughness={0.1}
-                emissive="#505060"
-                emissiveIntensity={0.3}
-              />
-            </mesh>
-          );
-        })}
-
-        {/* Hour hand */}
-        <mesh position={[0, 0.19, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-          <boxGeometry args={[0.04, 0.4, 0.015]} />
-          <meshStandardMaterial color="#e0e0e8" metalness={0.9} roughness={0.1} />
-        </mesh>
-
-        {/* Minute hand */}
-        <mesh position={[0.15, 0.19, -0.15]} rotation={[-Math.PI / 2, 0, Math.PI / 4]}>
-          <boxGeometry args={[0.025, 0.55, 0.01]} />
-          <meshStandardMaterial color="#e0e0e8" metalness={0.9} roughness={0.1} />
-        </mesh>
-
-        {/* Center pin */}
-        <mesh position={[0, 0.2, 0]}>
-          <cylinderGeometry args={[0.04, 0.04, 0.04, 16]} />
-          <meshStandardMaterial color="#ffd700" metalness={1} roughness={0.05} />
-        </mesh>
-
-        {/* Crown (winding knob) */}
-        <mesh position={[1.25, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.08, 0.1, 0.2, 16]} />
-          <meshStandardMaterial
-            color="#c0c0cc"
-            metalness={1}
-            roughness={0.15}
-          />
-        </mesh>
-
-        {/* Watch glass (crystal) */}
-        <mesh position={[0, 0.22, 0]}>
-          <cylinderGeometry args={[0.98, 0.98, 0.08, 64]} />
-          <meshPhysicalMaterial
-            color="#ffffff"
-            metalness={0}
-            roughness={0}
-            transmission={0.95}
-            thickness={0.5}
-            ior={1.5}
-            transparent
-            opacity={0.15}
-          />
-        </mesh>
-
-        {/* Strap - top */}
-        <mesh position={[0, 0, -1.5]}>
-          <boxGeometry args={[0.5, 0.12, 1.2]} />
-          <meshStandardMaterial
-            color="#1a1a1e"
-            metalness={0.1}
-            roughness={0.8}
-          />
-        </mesh>
-
-        {/* Strap - bottom */}
-        <mesh position={[0, 0, 1.5]}>
-          <boxGeometry args={[0.5, 0.12, 1.2]} />
-          <meshStandardMaterial
-            color="#1a1a1e"
-            metalness={0.1}
-            roughness={0.8}
-          />
-        </mesh>
-
-        {/* Lug connectors */}
-        {[-0.22, 0.22].map((x) =>
-          [-0.85, 0.85].map((z) => (
-            <mesh key={`${x}-${z}`} position={[x, 0, z]}>
-              <boxGeometry args={[0.08, 0.2, 0.15]} />
-              <meshStandardMaterial color="#c0c0cc" metalness={1} roughness={0.1} />
-            </mesh>
-          ))
-        )}
-
-        {/* Brand text placeholder - small dot */}
-        <mesh position={[0, 0.186, -0.35]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.005, 8]} />
-          <meshStandardMaterial color="#ffd700" metalness={1} roughness={0.1} />
-        </mesh>
-      </group>
-    </Float>
-  );
-}
-
-function LoadingFallback() {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-steel-light/50 text-sm tracking-widest uppercase animate-pulse">
-        Loading 3D Model...
-      </div>
-    </div>
-  );
-}
+const emitModelSelected = (modelId: string) => {
+  const url = new URL(window.location.href);
+  url.searchParams.set("model", modelId);
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  window.dispatchEvent(new CustomEvent("ahead:model-selected", { detail: modelId }));
+};
 
 export default function Watch3D() {
+  const [activeIndex, setActiveIndex] = useState(() => {
+    const model = new URLSearchParams(window.location.search).get("model");
+    const foundIndex = concepts.findIndex((concept) => concept.modelId === model);
+    return foundIndex >= 0 ? foundIndex : 0;
+  });
+  const active = concepts[activeIndex];
+
+  useEffect(() => {
+    const handleModelSelected = (event: Event) => {
+      const modelId = (event as CustomEvent<string>).detail;
+      const index = concepts.findIndex((concept) => concept.modelId === modelId);
+      if (index >= 0) setActiveIndex(index);
+    };
+    window.addEventListener("ahead:model-selected", handleModelSelected);
+    return () => window.removeEventListener("ahead:model-selected", handleModelSelected);
+  }, []);
+
+  const selectModel = (index: number) => {
+    setActiveIndex(index);
+    emitModelSelected(concepts[index].modelId);
+  };
+  const showPrevious = () => selectModel((activeIndex + concepts.length - 1) % concepts.length);
+  const showNext = () => selectModel((activeIndex + 1) % concepts.length);
+
   return (
-    <section className="relative py-24 md:py-32 overflow-hidden">
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="text-center mb-8">
-          <p className="text-steel-dark text-sm tracking-[0.3em] uppercase mb-4 font-medium">
-            Interactive Experience
+    <section aria-labelledby="watch-study-heading" className="relative overflow-hidden border-y border-white/10 bg-[#080A0E] py-20 sm:py-28 md:py-32">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_75%_40%,rgba(190,170,125,0.13),transparent_48%)]" />
+      <div className="relative mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-16">
+        <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
+          <p className="mb-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.34em] text-[#C9B58D]">
+            <span className="h-px w-8 bg-[#C9B58D]/70" /> AHEAD design language
           </p>
-          <h2 className="font-display text-3xl md:text-5xl font-bold text-gradient-steel tracking-tight">
-            Crafted To Perfection
+          <h2 id="watch-study-heading" className="max-w-xl font-display text-4xl font-medium leading-[1.04] tracking-tight text-white sm:text-5xl md:text-6xl">
+            One point of view. <span className="text-[#C9B58D]">Three expressions.</span>
           </h2>
-        </div>
+          <p className="mt-6 max-w-lg text-sm leading-7 text-white/55 sm:text-base">
+            Explore the concepts. Select a timepiece to see its story—and carry that exact choice into early access.
+          </p>
 
-        <div className="h-[400px] md:h-[550px] w-full cursor-grab active:cursor-grabbing">
-          <Suspense fallback={<LoadingFallback />}>
-            <Canvas
-              camera={{ position: [0, 2, 4.5], fov: 40 }}
-              dpr={[1, 2]}
-              gl={{ antialias: true, alpha: true }}
-              style={{ background: "transparent" }}
+          <motion.div key={active.modelId} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mt-10 border-l border-[#C9B58D]/60 pl-5">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-[#C9B58D]">{active.edition}</p>
+            <h3 className="mt-3 font-display text-2xl text-white sm:text-3xl">{active.name}</h3>
+            <p className="mt-4 max-w-lg text-sm leading-7 text-white/65">{active.description}</p>
+            <p className="mt-4 text-[9px] font-medium uppercase tracking-[0.18em] text-white/40">{active.mood}</p>
+            <button
+              type="button"
+              onClick={() => {
+                emitModelSelected(active.modelId);
+                window.location.hash = "waitlist";
+                document.getElementById("waitlist")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="mt-7 inline-flex min-h-12 items-center justify-between gap-8 border border-[#C9B58D]/45 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white transition duration-300 hover:border-[#E1D0AA] hover:bg-[#C9B58D]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C9B58D]"
             >
-              <ambientLight intensity={0.3} />
-              <spotLight
-                position={[5, 8, 5]}
-                angle={0.3}
-                penumbra={0.8}
-                intensity={1.5}
-                castShadow
-                color="#e0e0f0"
-              />
-              <spotLight
-                position={[-5, 5, -3]}
-                angle={0.4}
-                penumbra={1}
-                intensity={0.8}
-                color="#8090b0"
-              />
-              <pointLight position={[0, -3, 0]} intensity={0.2} color="#4050a0" />
+              Get early access <span aria-hidden="true">↗</span>
+            </button>
+          </motion.div>
+        </motion.div>
 
-              <WatchModel />
+        <div className="min-w-0">
+          <motion.div key={active.image} initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.45 }} className="relative overflow-hidden border border-white/10 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.09),rgba(255,255,255,0.015)_55%,transparent_78%)]">
+            <div className="absolute left-5 top-5 z-10 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/55">AHEAD concept study / 0{activeIndex + 1}</div>
+            <div className="flex aspect-[4/3] items-center justify-center p-5 sm:p-10">
+              <img src={active.image} alt={active.alt} referrerPolicy="no-referrer" className="h-full w-full object-contain drop-shadow-[0_28px_42px_rgba(0,0,0,0.42)]" />
+            </div>
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#080A0E]/85 to-transparent" />
+            <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[#C9B58D]">{active.edition}</p>
+                <h3 className="mt-1 font-display text-xl text-white sm:text-2xl">{active.name}</h3>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button type="button" onClick={showPrevious} aria-label="Previous AHEAD concept" className="grid h-10 w-10 place-items-center border border-white/25 bg-black/30 text-white transition hover:border-[#C9B58D] hover:text-[#E1D0AA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9B58D]"><ArrowLeft className="h-4 w-4" /></button>
+                <button type="button" onClick={showNext} aria-label="Next AHEAD concept" className="grid h-10 w-10 place-items-center border border-white/25 bg-black/30 text-white transition hover:border-[#C9B58D] hover:text-[#E1D0AA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9B58D]"><ArrowRight className="h-4 w-4" /></button>
+              </div>
+            </div>
+          </motion.div>
 
-              <ContactShadows
-                position={[0, -1.8, 0]}
-                opacity={0.4}
-                scale={8}
-                blur={2.5}
-                far={4}
-              />
-
-              <Environment preset="studio" />
-            </Canvas>
-          </Suspense>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            {concepts.map((concept, index) => (
+              <button key={concept.modelId} type="button" onClick={() => selectModel(index)} aria-pressed={activeIndex === index} className={`group overflow-hidden border text-left transition duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9B58D] ${activeIndex === index ? "border-[#C9B58D] bg-[#C9B58D]/[0.07]" : "border-white/10 hover:border-white/35"}`}>
+                <div className="relative aspect-[4/3] bg-white/[0.03] p-2 sm:p-3">
+                  <img src={concept.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105" />
+                  {activeIndex === index && <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#C9B58D] text-[#090a0d]"><Check className="h-3 w-3" /></span>}
+                </div>
+                <span className="block truncate px-2 pb-2 pt-1 text-[9px] uppercase tracking-[0.1em] text-white/65 sm:px-3">{concept.name}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-4 text-[10px] leading-5 text-white/35">Temporary reference photography for layout exploration only—not AHEAD products. Replace with original or properly licensed AHEAD imagery before launch. These are concept visuals, not interactive 3D models.</p>
         </div>
-
-        <p className="text-center text-muted-foreground/60 text-xs tracking-widest uppercase mt-4">
-          Drag to rotate • Scroll to explore
-        </p>
       </div>
     </section>
   );
