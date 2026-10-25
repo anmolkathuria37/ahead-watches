@@ -40,7 +40,7 @@ interface Grievance {
   createdAt: string;
 }
 
-const COLORS = ["#4ade80", "#facc15", "#f87171", "#60a5fa"];
+const COLORS = ["#C9B58D", "#E1D0AA", "#8D8066", "#8C9BAB"];
 const MODEL_LABELS: Record<string, string> = {
   "5am": "5:00 AM Edition",
   founder: "Founder's Steel",
