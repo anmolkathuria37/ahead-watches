@@ -1,239 +1,90 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, ContactShadows, Float } from "@react-three/drei";
-import { useRef, Suspense } from "react";
-import * as THREE from "three";
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
 
-function WatchModel() {
-  const groupRef = useRef<THREE.Group>(null);
-
-  useFrame((state) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = state.clock.elapsedTime * 0.15;
-      groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.05;
-    }
-  });
-
-  return (
-    <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.3}>
-      <group ref={groupRef} scale={1.2}>
-        {/* Watch case - main body */}
-        <mesh position={[0, 0, 0]} castShadow>
-          <cylinderGeometry args={[1.1, 1.1, 0.35, 64]} />
-          <meshStandardMaterial
-            color="#2a2a30"
-            metalness={0.95}
-            roughness={0.1}
-            envMapIntensity={1.5}
-          />
-        </mesh>
-
-        {/* Watch case - bezel ring */}
-        <mesh position={[0, 0.18, 0]}>
-          <torusGeometry args={[1.05, 0.06, 16, 64]} />
-          <meshStandardMaterial
-            color="#c0c0cc"
-            metalness={1}
-            roughness={0.05}
-            envMapIntensity={2}
-          />
-        </mesh>
-        <mesh position={[0, -0.18, 0]}>
-          <torusGeometry args={[1.05, 0.06, 16, 64]} />
-          <meshStandardMaterial
-            color="#c0c0cc"
-            metalness={1}
-            roughness={0.05}
-            envMapIntensity={2}
-          />
-        </mesh>
-
-        {/* Watch dial / face */}
-        <mesh position={[0, 0.181, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.95, 64]} />
-          <meshStandardMaterial
-            color="#0a0a12"
-            metalness={0.3}
-            roughness={0.4}
-          />
-        </mesh>
-
-        {/* Hour markers */}
-        {Array.from({ length: 12 }).map((_, i) => {
-          const angle = (i / 12) * Math.PI * 2;
-          const r = 0.78;
-          const isMain = i % 3 === 0;
-          return (
-            <mesh
-              key={i}
-              position={[
-                Math.sin(angle) * r,
-                0.185,
-                Math.cos(angle) * r,
-              ]}
-              rotation={[-Math.PI / 2, 0, 0]}
-            >
-              <boxGeometry args={[isMain ? 0.06 : 0.03, isMain ? 0.14 : 0.08, 0.01]} />
-              <meshStandardMaterial
-                color="#e0e0e8"
-                metalness={0.9}
-                roughness={0.1}
-                emissive="#505060"
-                emissiveIntensity={0.3}
-              />
-            </mesh>
-          );
-        })}
-
-        {/* Hour hand */}
-        <mesh position={[0, 0.19, 0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-          <boxGeometry args={[0.04, 0.4, 0.015]} />
-          <meshStandardMaterial color="#e0e0e8" metalness={0.9} roughness={0.1} />
-        </mesh>
-
-        {/* Minute hand */}
-        <mesh position={[0.15, 0.19, -0.15]} rotation={[-Math.PI / 2, 0, Math.PI / 4]}>
-          <boxGeometry args={[0.025, 0.55, 0.01]} />
-          <meshStandardMaterial color="#e0e0e8" metalness={0.9} roughness={0.1} />
-        </mesh>
-
-        {/* Center pin */}
-        <mesh position={[0, 0.2, 0]}>
-          <cylinderGeometry args={[0.04, 0.04, 0.04, 16]} />
-          <meshStandardMaterial color="#ffd700" metalness={1} roughness={0.05} />
-        </mesh>
-
-        {/* Crown (winding knob) */}
-        <mesh position={[1.25, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.08, 0.1, 0.2, 16]} />
-          <meshStandardMaterial
-            color="#c0c0cc"
-            metalness={1}
-            roughness={0.15}
-          />
-        </mesh>
-
-        {/* Watch glass (crystal) */}
-        <mesh position={[0, 0.22, 0]}>
-          <cylinderGeometry args={[0.98, 0.98, 0.08, 64]} />
-          <meshPhysicalMaterial
-            color="#ffffff"
-            metalness={0}
-            roughness={0}
-            transmission={0.95}
-            thickness={0.5}
-            ior={1.5}
-            transparent
-            opacity={0.15}
-          />
-        </mesh>
-
-        {/* Strap - top */}
-        <mesh position={[0, 0, -1.5]}>
-          <boxGeometry args={[0.5, 0.12, 1.2]} />
-          <meshStandardMaterial
-            color="#1a1a1e"
-            metalness={0.1}
-            roughness={0.8}
-          />
-        </mesh>
-
-        {/* Strap - bottom */}
-        <mesh position={[0, 0, 1.5]}>
-          <boxGeometry args={[0.5, 0.12, 1.2]} />
-          <meshStandardMaterial
-            color="#1a1a1e"
-            metalness={0.1}
-            roughness={0.8}
-          />
-        </mesh>
-
-        {/* Lug connectors */}
-        {[-0.22, 0.22].map((x) =>
-          [-0.85, 0.85].map((z) => (
-            <mesh key={`${x}-${z}`} position={[x, 0, z]}>
-              <boxGeometry args={[0.08, 0.2, 0.15]} />
-              <meshStandardMaterial color="#c0c0cc" metalness={1} roughness={0.1} />
-            </mesh>
-          ))
-        )}
-
-        {/* Brand text placeholder - small dot */}
-        <mesh position={[0, 0.186, -0.35]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.005, 8]} />
-          <meshStandardMaterial color="#ffd700" metalness={1} roughness={0.1} />
-        </mesh>
-      </group>
-    </Float>
-  );
-}
-
-function LoadingFallback() {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-steel-light/50 text-sm tracking-widest uppercase animate-pulse">
-        Loading 3D Model...
-      </div>
-    </div>
-  );
-}
+const references = [
+  {
+    name: "Astronomia Solar",
+    edition: "Celestial complication",
+    image: "https://www.watchesofswitzerland.com/cdn/shop/files/18100268_1.jpg?height=1600&v=1745258611&width=1600",
+    source: "https://www.watchesofswitzerland.com/products/jacob-co-astronomia-as300-40-aa-ae-abala-18100268",
+    sourceName: "Watches of Switzerland",
+    alt: "Jacob & Co. Astronomia Solar watch with a blue celestial dial",
+  },
+  {
+    name: "Astronomia Tourbillon",
+    edition: "Open-worked movement",
+    image: "https://cdn.thewatchpages.com/app/uploads/2020/03/13214504/jacob-co-astronomia-tourbillon-at10040acsda.jpg",
+    source: "https://www.thewatchpages.com/watches/jacob-co-astronomia-tourbillon-at10040acsda/",
+    sourceName: "The Watch Pages",
+    alt: "Jacob & Co. Astronomia Tourbillon with a visible mechanical movement",
+  },
+  {
+    name: "Astronomia Black Ceramic",
+    edition: "Black ceramic case",
+    image: "https://www.europastar.com/local/cache-vignettes/L1400xH1653/jacob.co-7d78f.jpg",
+    source: "https://www.europastar.com/watch-gallery/1004090452-jacob-co-astronomia-black-ceramic.html",
+    sourceName: "Europa Star",
+    alt: "Jacob & Co. Astronomia Black Ceramic watch",
+  },
+];
 
 export default function Watch3D() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const active = references[activeIndex];
+  const showPrevious = () => setActiveIndex((current) => (current + references.length - 1) % references.length);
+  const showNext = () => setActiveIndex((current) => (current + 1) % references.length);
+
   return (
-    <section className="relative py-24 md:py-32 overflow-hidden">
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="text-center mb-8">
-          <p className="text-steel-dark text-sm tracking-[0.3em] uppercase mb-4 font-medium">
-            Interactive Experience
+    <section className="relative overflow-hidden border-y border-white/10 bg-[#07090d] py-20 sm:py-28 md:py-32">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_35%,rgba(171,143,94,0.14),transparent_52%)]" />
+      <div className="relative mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-16">
+        <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
+          <p className="mb-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.34em] text-[#c8b58a]">
+            <span className="h-px w-8 bg-[#c8b58a]/70" /> The art of horology
           </p>
-          <h2 className="font-display text-3xl md:text-5xl font-bold text-gradient-steel tracking-tight">
-            Crafted To Perfection
+          <h2 className="max-w-xl font-display text-4xl font-medium leading-[1.04] tracking-tight text-white sm:text-5xl md:text-6xl">
+            Extraordinary timepieces. <span className="text-[#c8b58a]">Uncompromising detail.</span>
           </h2>
+          <p className="mt-6 max-w-lg text-sm leading-7 text-white/60 sm:text-base">
+            A temporary visual moodboard while AHEAD’s own product photography and 3D assets are being developed. Explore these reference timepieces; they are not AHEAD products.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <a href={active.source} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 border border-white/20 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white transition hover:border-[#c8b58a]/70 hover:text-[#e2d1a8]">
+              View source imagery · {active.sourceName} <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            </a>
+            <span className="text-[10px] uppercase tracking-[0.16em] text-white/35">Reference only · replace before launch</span>
+          </div>
+        </motion.div>
+
+        <div className="min-w-0">
+          <motion.div key={active.image} initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.45 }} className="relative overflow-hidden border border-white/10 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.09),rgba(255,255,255,0.015)_55%,transparent_78%)]">
+            <div className="absolute left-5 top-5 z-10 text-[9px] font-semibold uppercase tracking-[0.22em] text-white/60">AHEAD visual study / 0{activeIndex + 1}</div>
+            <div className="flex aspect-[4/3] items-center justify-center p-5 sm:p-10">
+              <img src={active.image} alt={active.alt} referrerPolicy="no-referrer" className="h-full w-full object-contain drop-shadow-[0_28px_42px_rgba(0,0,0,0.42)]" />
+            </div>
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#07090d]/90 to-transparent" />
+            <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[#c8b58a]">{active.edition}</p>
+                <h3 className="mt-1 font-display text-xl text-white sm:text-2xl">{active.name}</h3>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button type="button" onClick={showPrevious} aria-label="Previous reference watch" className="grid h-10 w-10 place-items-center border border-white/25 bg-black/30 text-white transition hover:border-[#c8b58a] hover:text-[#e2d1a8]"><ArrowLeft className="h-4 w-4" /></button>
+                <button type="button" onClick={showNext} aria-label="Next reference watch" className="grid h-10 w-10 place-items-center border border-white/25 bg-black/30 text-white transition hover:border-[#c8b58a] hover:text-[#e2d1a8]"><ArrowRight className="h-4 w-4" /></button>
+              </div>
+            </div>
+          </motion.div>
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            {references.map((reference, index) => (
+              <button key={reference.name} type="button" onClick={() => setActiveIndex(index)} aria-pressed={activeIndex === index} className={`group overflow-hidden border text-left transition ${activeIndex === index ? "border-[#c8b58a]" : "border-white/10 hover:border-white/35"}`}>
+                <div className="aspect-[4/3] bg-white/[0.03] p-2 sm:p-3"><img src={reference.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105" /></div>
+                <span className="block truncate px-2 pb-2 text-[9px] uppercase tracking-[0.1em] text-white/65 sm:px-3">{reference.name}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-[10px] leading-5 text-white/35">Images linked from their respective publishers. Usage rights should be confirmed before a public or commercial launch.</p>
         </div>
-
-        <div className="h-[400px] md:h-[550px] w-full cursor-grab active:cursor-grabbing">
-          <Suspense fallback={<LoadingFallback />}>
-            <Canvas
-              camera={{ position: [0, 2, 4.5], fov: 40 }}
-              dpr={[1, 2]}
-              gl={{ antialias: true, alpha: true }}
-              style={{ background: "transparent" }}
-            >
-              <ambientLight intensity={0.3} />
-              <spotLight
-                position={[5, 8, 5]}
-                angle={0.3}
-                penumbra={0.8}
-                intensity={1.5}
-                castShadow
-                color="#e0e0f0"
-              />
-              <spotLight
-                position={[-5, 5, -3]}
-                angle={0.4}
-                penumbra={1}
-                intensity={0.8}
-                color="#8090b0"
-              />
-              <pointLight position={[0, -3, 0]} intensity={0.2} color="#4050a0" />
-
-              <WatchModel />
-
-              <ContactShadows
-                position={[0, -1.8, 0]}
-                opacity={0.4}
-                scale={8}
-                blur={2.5}
-                far={4}
-              />
-
-              <Environment preset="studio" />
-            </Canvas>
-          </Suspense>
-        </div>
-
-        <p className="text-center text-muted-foreground/60 text-xs tracking-widest uppercase mt-4">
-          Drag to rotate • Scroll to explore
-        </p>
       </div>
     </section>
   );
