@@ -111,7 +111,7 @@ const ProductShowcase = () => {
                 </div>
 
                 <a
-                  href={`?model=${watch.modelId}#waitlist`}
+                  href="#waitlist"
                   onClick={() => {
                     const url = new URL(window.location.href);
                     url.searchParams.set("model", watch.modelId);
