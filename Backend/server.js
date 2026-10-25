@@ -123,7 +123,7 @@ const WaitlistSchema = new mongoose.Schema(
     phone: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, unique: true, trim: true },
     model: { type: String, required: true, enum: ["5am", "founder", "midnight"] },
-    preorder: { type: String, required: true, enum: ["yes", "maybe", "no"] },
+    preorder: { type: String, required: true, default: "not_asked", enum: ["yes", "maybe", "no", "not_asked"] },
     status: { type: String, default: "pending", enum: ["pending", "fulfilled"] },
     password: { type: String },
   },
@@ -394,9 +394,9 @@ app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
     const phone = sanitize(req.body.phone);
     const email = sanitize(req.body.email).toLowerCase();
     const model = sanitize(req.body.model);
-    const preorder = sanitize(req.body.preorder);
+    const preorder = sanitize(req.body.preorder) || "not_asked";
 
-    if (!name || !phone || !email || !model || !preorder) {
+    if (!name || !phone || !email || !model) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -408,7 +408,7 @@ app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
       return res.status(400).json({ message: "Invalid model" });
     }
 
-    if (!["yes", "maybe", "no"].includes(preorder)) {
+    if (!["yes", "maybe", "no", "not_asked"].includes(preorder)) {
       return res.status(400).json({ message: "Invalid preorder value" });
     }
 
