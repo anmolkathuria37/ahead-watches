@@ -51,7 +51,7 @@ export default function Watch3D() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <a href={active.source} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 border border-white/20 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white transition hover:border-[#c8b58a]/70 hover:text-[#e2d1a8]">
-              View source imagery <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              View source imagery · {active.sourceName} <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
             </a>
             <span className="text-[10px] uppercase tracking-[0.16em] text-white/35">Reference only · replace before launch</span>
           </div>
