@@ -1,5 +1,5 @@
 import { motion, useInView } from "framer-motion";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import WaitlistConfirmation from "./ui/WaitlistConfirmation";
 
@@ -10,11 +10,26 @@ const WaitlistSection = () => {
   const [form, setForm] = useState({
     name: "",
     email: "",
-    model: "",
+    model: (() => {
+      const requestedModel = new URLSearchParams(window.location.search).get("model");
+      return ["5am", "founder", "midnight"].includes(requestedModel ?? "") ? requestedModel! : "";
+    })(),
     phone : "",
     preorder: "",
   });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const handleModelSelected = (event: Event) => {
+      const model = (event as CustomEvent<string>).detail;
+      if (["5am", "founder", "midnight"].includes(model)) {
+        setForm((current) => ({ ...current, model }));
+      }
+    };
+
+    window.addEventListener("ahead:model-selected", handleModelSelected);
+    return () => window.removeEventListener("ahead:model-selected", handleModelSelected);
+  }, []);
 
 
 
