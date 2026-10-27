@@ -398,12 +398,25 @@ const hashPassword = (password) =>
   });
 
 const verifyPassword = async (password, storedPassword) => {
-  if (typeof storedPassword !== "string") return false;
-  if (!storedPassword.startsWith("scrypt$")) {
-    if (!storedPassword.length || password.length !== storedPassword.length) return false;
-    return crypto.timingSafeEqual(Buffer.from(password), Buffer.from(storedPassword));
+  if (typeof storedPassword !== "string" || !storedPassword) return false;
+
+  // Current format: scrypt$<32-char salt>$<128-char hash>.
+  // Also verify the legacy format emitted by earlier deployments: scrypt<salt><hash>.
+  let salt;
+  let expectedHex;
+  if (storedPassword.startsWith("scrypt$")) {
+    [, salt, expectedHex] = storedPassword.split("$");
+  } else {
+    const legacyMatch = storedPassword.match(/^scrypt([a-f0-9]{32})([a-f0-9]{128})$/i);
+    if (legacyMatch) {
+      [, salt, expectedHex] = legacyMatch;
+    } else {
+      // Temporary compatibility for any genuinely legacy plaintext records.
+      if (password.length !== storedPassword.length) return false;
+      return crypto.timingSafeEqual(Buffer.from(password), Buffer.from(storedPassword));
+    }
   }
-  const [, salt, expectedHex] = storedPassword.split("$");
+
   if (!salt || !expectedHex || !/^[a-f0-9]{128}$/i.test(expectedHex)) return false;
   const actual = await new Promise((resolve, reject) =>
     crypto.scrypt(password, salt, 64, (err, key) => err ? reject(err) : resolve(key))
@@ -493,6 +506,11 @@ app.post("/api/user/login", rateLimit(60000, 10), async (req, res) => {
     if (!user.password.startsWith("scrypt$")) {
       user.password = await hashPassword(password);
       await user.save();
+      // Keep all model entries for this email on the same account password.
+      await Waitlist.updateMany(
+        { email: user.email, _id: { $ne: user._id } },
+        { $set: { password: user.password } }
+      );
     }
 
     const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -513,6 +531,7 @@ const userAuth = (req, res, next) => {
   try {
     const decoded = jwt.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
     req.userId = decoded.userId;
+    req.userEmail = typeof decoded.email === "string" ? decoded.email.toLowerCase() : null;
     next();
   } catch {
     return res.status(403).json({ message: "Invalid token" });
@@ -524,14 +543,71 @@ const userAuth = (req, res, next) => {
 ======================= */
 app.get("/api/user/me", userAuth, async (req, res) => {
   try {
-    const user = await Waitlist.findById(req.userId).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const query = req.userEmail ? { email: req.userEmail } : { _id: req.userId };
+    const entries = await Waitlist.find(query).select("-password").sort({ createdAt: 1 });
+    if (entries.length === 0) return res.status(404).json({ message: "User not found" });
 
-    const position = await Waitlist.countDocuments({ createdAt: { $lte: user.createdAt } });
+    const entriesWithPositions = await Promise.all(entries.map(async (entry) => ({
+      ...entry.toObject(),
+      position: await Waitlist.countDocuments({ createdAt: { $lte: entry.createdAt } }),
+    })));
+    const primaryEntry = entriesWithPositions[0];
 
-    return res.json({ ...user.toObject(), position });
+    return res.json({
+      ...primaryEntry,
+      entries: entriesWithPositions,
+      position: primaryEntry.position,
+    });
   } catch (err) {
+    console.error("User profile fetch failed:", err.message);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Users may edit their own contact details across all their model entries.
+app.put("/api/user/profile", userAuth, async (req, res) => {
+  try {
+    const name = sanitize(req.body?.name);
+    const phone = sanitize(req.body?.phone);
+    if (!name || name.length > 100) return res.status(400).json({ message: "Enter a valid name (max 100 characters)." });
+    if (!phone || phone.length > 30) return res.status(400).json({ message: "Enter a valid phone number (max 30 characters)." });
+
+    const query = req.userEmail ? { email: req.userEmail } : { _id: req.userId };
+    const result = await Waitlist.updateMany(query, { $set: { name, phone } });
+    if (!result.matchedCount) return res.status(404).json({ message: "User not found" });
+
+    return res.json({ message: "Profile updated", name, phone });
+  } catch (err) {
+    console.error("User profile update failed:", err.message);
+    return res.status(500).json({ message: "Could not update your profile." });
+  }
+});
+
+// Users may update their interest for their own model entries, but not admin-controlled status.
+app.put("/api/user/waitlist/:id", userAuth, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid waitlist entry." });
+    }
+    const preorder = sanitize(req.body?.preorder);
+    if (!["yes", "maybe", "no", "not_asked"].includes(preorder)) {
+      return res.status(400).json({ message: "Choose a valid interest option." });
+    }
+
+    const query = req.userEmail
+      ? { _id: req.params.id, email: req.userEmail }
+      : { _id: req.params.id, _id: req.userId };
+    const entry = await Waitlist.findOneAndUpdate(
+      query,
+      { $set: { preorder } },
+      { new: true, runValidators: true }
+    ).select("-password");
+    if (!entry) return res.status(404).json({ message: "Waitlist entry not found." });
+
+    return res.json({ message: "Waitlist preference updated", entry });
+  } catch (err) {
+    console.error("User waitlist update failed:", err.message);
+    return res.status(500).json({ message: "Could not update your waitlist preference." });
   }
 });
 
@@ -542,7 +618,9 @@ app.post("/api/user/grievance", userAuth, rateLimit(60000, 3), async (req, res) 
     if (!subject || !message) return res.status(400).json({ message: "All fields required" });
     if (subject.length > 200 || message.length > 1000) return res.status(400).json({ message: "Input too long" });
 
-    const user = await Waitlist.findById(req.userId);
+    const user = req.userEmail
+      ? await Waitlist.findOne({ email: req.userEmail })
+      : await Waitlist.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     await Grievance.create({
