@@ -58,6 +58,11 @@ export default function UserDashboard() {
   const [profileName, setProfileName] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
   const [grievanceSubject, setGrievanceSubject] = useState("");
   const [grievanceMessage, setGrievanceMessage] = useState("");
   const [sendingGrievance, setSendingGrievance] = useState(false);
@@ -131,6 +136,37 @@ export default function UserDashboard() {
       toast.error(error instanceof Error ? error.message : "Could not update your profile.");
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handlePasswordChange = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (newPassword.length < 12) {
+      toast.error("Use at least 12 characters for your new password.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("The new passwords do not match.");
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      const response = await fetch(API + "/api/user/password", {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not change password.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordOpen(false);
+      toast.success("Your password has been changed.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not change password.");
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -221,9 +257,14 @@ export default function UserDashboard() {
               <h1 className="font-display text-3xl font-bold text-gradient-steel sm:text-4xl">Welcome, {user.name}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Every timepiece you have your eye on, together in one place. Your waitlist details stay tied to your account.</p>
             </div>
-            <button onClick={() => setProfileOpen((open) => !open)} className="min-h-11 self-start rounded-sm border border-border px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] transition hover:border-steel/60 sm:self-auto">
-              {profileOpen ? "Close profile editor" : "Edit contact details"}
-            </button>
+            <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+              <button onClick={() => setProfileOpen((open) => !open)} className="min-h-11 rounded-sm border border-border px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] transition hover:border-steel/60">
+                {profileOpen ? "Close profile editor" : "Edit contact details"}
+              </button>
+              <button onClick={() => setPasswordOpen((open) => !open)} className="min-h-11 rounded-sm border border-border px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] transition hover:border-steel/60">
+                {passwordOpen ? "Close password editor" : "Change password"}
+              </button>
+            </div>
           </motion.section>
         </ScrollReveal>
 
@@ -245,6 +286,34 @@ export default function UserDashboard() {
                   <p className="text-xs text-muted-foreground">Email: {user.email} <span className="ml-1">(account identifier)</span></p>
                   <button type="submit" disabled={savingProfile} className="min-h-11 rounded-sm bg-gradient-steel px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-foreground disabled:opacity-50">
                     {savingProfile ? "Saving…" : "Save details"}
+                  </button>
+                </div>
+              </form>
+            </GlassCard>
+          </ScrollReveal>
+        )}
+
+        {passwordOpen && (
+          <ScrollReveal>
+            <GlassCard className="mb-8">
+              <h2 className="mb-1 font-display text-xl font-semibold">Change your password</h2>
+              <p className="mb-5 text-sm text-muted-foreground">Use at least 12 characters. Your new password applies to every watch on this account.</p>
+              <form onSubmit={handlePasswordChange} className="grid gap-4 md:grid-cols-3">
+                <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                  Current password
+                  <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" required className="mt-2 min-h-12 w-full rounded-sm border border-border bg-input px-4 py-3 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                </label>
+                <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                  New password
+                  <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" minLength={12} maxLength={128} required className="mt-2 min-h-12 w-full rounded-sm border border-border bg-input px-4 py-3 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                </label>
+                <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                  Confirm new password
+                  <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" minLength={12} maxLength={128} required className="mt-2 min-h-12 w-full rounded-sm border border-border bg-input px-4 py-3 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                </label>
+                <div className="md:col-span-3">
+                  <button type="submit" disabled={savingPassword} className="min-h-11 rounded-sm bg-gradient-steel px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-foreground disabled:opacity-50">
+                    {savingPassword ? "Updating…" : "Update password"}
                   </button>
                 </div>
               </form>
