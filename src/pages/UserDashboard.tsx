@@ -170,24 +170,28 @@ export default function UserDashboard() {
     }
   };
 
-  const handleInterestChange = async (entry: WaitlistEntry, preorder: PreorderValue) => {
-    if (entry.preorder === preorder || savingEntry) return;
+  const handleEntryUpdate = async (
+    entry: WaitlistEntry,
+    updates: Partial<Pick<WaitlistEntry, "preorder" | "model">>,
+  ) => {
+    if (savingEntry) return;
+    if (updates.preorder === entry.preorder && updates.model === entry.model) return;
     setSavingEntry(entry._id);
     try {
       const response = await fetch(API + "/api/user/waitlist/" + encodeURIComponent(entry._id), {
         method: "PUT",
         headers: authHeaders(),
-        body: JSON.stringify({ preorder }),
+        body: JSON.stringify(updates),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "Your preference could not be saved.");
+      if (!response.ok) throw new Error(data.message || "Your waitlist changes could not be saved.");
       setUser((current) => current ? {
         ...current,
-        entries: current.entries.map((item) => item._id === entry._id ? { ...item, preorder } : item),
+        entries: current.entries.map((item) => item._id === entry._id ? { ...item, ...updates } : item),
       } : current);
-      toast.success("Your preference has been saved.");
+      toast.success("Your waitlist changes have been saved.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update your preference.");
+      toast.error(error instanceof Error ? error.message : "Could not update your waitlist.");
     } finally {
       setSavingEntry(null);
     }
@@ -374,9 +378,17 @@ export default function UserDashboard() {
                           ))}
                         </ul>
                       </div>
+                      <label className="mb-4 block text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                        Selected model · editable
+                        <select value={entry.model} onChange={(event) => void handleEntryUpdate(entry, { model: event.target.value })} disabled={savingEntry !== null} className="mt-2 min-h-11 w-full rounded-sm border border-border bg-input px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring disabled:opacity-60">
+                          <option value="5am">5:00 AM Edition</option>
+                          <option value="founder">Founder’s Steel</option>
+                          <option value="midnight">Midnight Discipline</option>
+                        </select>
+                      </label>
                       <label className="block text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
                         Your pre-order interest
-                        <select value={entry.preorder} onChange={(event) => void handleInterestChange(entry, event.target.value as PreorderValue)} disabled={savingEntry !== null} className="mt-2 min-h-11 w-full rounded-sm border border-border bg-input px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring disabled:opacity-60">
+                        <select value={entry.preorder} onChange={(event) => void handleEntryUpdate(entry, { preorder: event.target.value as PreorderValue })} disabled={savingEntry !== null} className="mt-2 min-h-11 w-full rounded-sm border border-border bg-input px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring disabled:opacity-60">
                           <option value="not_asked">Not decided</option>
                           <option value="yes">Interested in pre-order</option>
                           <option value="maybe">Still deciding</option>
