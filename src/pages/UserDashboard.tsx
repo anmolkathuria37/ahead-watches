@@ -175,7 +175,10 @@ export default function UserDashboard() {
     updates: Partial<Pick<WaitlistEntry, "preorder" | "model">>,
   ) => {
     if (savingEntry) return;
-    if (updates.preorder === entry.preorder && updates.model === entry.model) return;
+    if (
+      (updates.preorder === undefined || updates.preorder === entry.preorder) &&
+      (updates.model === undefined || updates.model === entry.model)
+    ) return;
     setSavingEntry(entry._id);
     try {
       const response = await fetch(API + "/api/user/waitlist/" + encodeURIComponent(entry._id), {
