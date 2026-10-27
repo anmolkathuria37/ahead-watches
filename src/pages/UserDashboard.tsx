@@ -24,72 +24,159 @@ const watchSpecs: Record<string, string[]> = {
   midnight: ["44mm case diameter", "Japanese Quartz movement", "Navy PVD coating", "5ATM water resistant", "Luminous markers"],
 };
 
-interface UserData {
+type PreorderValue = "yes" | "maybe" | "no" | "not_asked";
+interface WaitlistEntry {
   _id: string;
   name: string;
   email: string;
   phone: string;
   model: string;
-  preorder: string;
+  preorder: PreorderValue;
   createdAt: string;
   position?: number;
-  status?: string;
+  status?: "pending" | "fulfilled";
+}
+interface Account extends WaitlistEntry {
+  entries: WaitlistEntry[];
 }
 
+const interestLabels: Record<PreorderValue, string> = {
+  yes: "Interested in pre-order",
+  maybe: "Still deciding",
+  no: "Not interested right now",
+  not_asked: "Not decided",
+};
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
 export default function UserDashboard() {
-  const [user, setUser] = useState<UserData | null>(null);
+  const [user, setUser] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingEntry, setSavingEntry] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const [grievanceSubject, setGrievanceSubject] = useState("");
   const [grievanceMessage, setGrievanceMessage] = useState("");
   const [sendingGrievance, setSendingGrievance] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const authHeaders = () => ({
+    Authorization: "Bearer " + localStorage.getItem("user_token"),
+    "Content-Type": "application/json",
+  });
+
+  const loadAccount = async () => {
     const token = localStorage.getItem("user_token");
     if (!token) {
       navigate("/login");
       return;
     }
-    fetch(API + "/api/user/me", {
-      headers: { Authorization: "Bearer " + token },
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error();
-        return r.json();
-      })
-      .then(setUser)
-      .catch(() => {
-        localStorage.removeItem("user_token");
-        navigate("/login");
-      })
-      .finally(() => setLoading(false));
+    if (!API) {
+      toast.error("The account service is not configured.");
+      setLoading(false);
+      return;
+    }
+    try {
+      const response = await fetch(API + "/api/user/me", { headers: authHeaders() });
+      if (!response.ok) throw new Error("Your session has expired. Please log in again.");
+      const data = await response.json();
+      const entries: WaitlistEntry[] = Array.isArray(data.entries) ? data.entries : [data];
+      const account: Account = { ...data, entries };
+      setUser(account);
+      setProfileName(account.name || "");
+      setProfilePhone(account.phone || "");
+    } catch (error) {
+      localStorage.removeItem("user_token");
+      localStorage.removeItem("user_email");
+      toast.error(error instanceof Error ? error.message : "Could not load your account.");
+      navigate("/login");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAccount();
+    // loadAccount is intentionally invoked once for the current login session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
-  const handleGrievance = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleProfileSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!profileName.trim() || !profilePhone.trim()) {
+      toast.error("Please enter your name and phone number.");
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const response = await fetch(API + "/api/user/profile", {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ name: profileName.trim(), phone: profilePhone.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Profile could not be updated.");
+      setUser((current) => current ? {
+        ...current,
+        name: profileName.trim(),
+        phone: profilePhone.trim(),
+        entries: current.entries.map((entry) => ({ ...entry, name: profileName.trim(), phone: profilePhone.trim() })),
+      } : current);
+      setProfileOpen(false);
+      toast.success("Your profile has been updated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update your profile.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleInterestChange = async (entry: WaitlistEntry, preorder: PreorderValue) => {
+    if (entry.preorder === preorder || savingEntry) return;
+    setSavingEntry(entry._id);
+    try {
+      const response = await fetch(API + "/api/user/waitlist/" + encodeURIComponent(entry._id), {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ preorder }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Your preference could not be saved.");
+      setUser((current) => current ? {
+        ...current,
+        entries: current.entries.map((item) => item._id === entry._id ? { ...item, preorder } : item),
+      } : current);
+      toast.success("Your preference has been saved.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update your preference.");
+    } finally {
+      setSavingEntry(null);
+    }
+  };
+
+  const handleGrievance = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!grievanceSubject.trim() || !grievanceMessage.trim()) {
-      toast.error("Please fill all fields");
+      toast.error("Please fill in both the subject and message.");
       return;
     }
     setSendingGrievance(true);
     try {
-      const res = await fetch(API + "/api/user/grievance", {
+      const response = await fetch(API + "/api/user/grievance", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + localStorage.getItem("user_token"),
-        },
-        body: JSON.stringify({ subject: grievanceSubject, message: grievanceMessage }),
+        headers: authHeaders(),
+        body: JSON.stringify({ subject: grievanceSubject.trim(), message: grievanceMessage.trim() }),
       });
-      if (res.ok) {
-        toast.success("Grievance submitted. We'll get back to you soon.");
-        setGrievanceSubject("");
-        setGrievanceMessage("");
-      } else {
-        toast.error("Failed to submit grievance");
-      }
-    } catch {
-      toast.error("Connection error");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Failed to submit your message.");
+      toast.success("Message submitted. The AHEAD team will review it.");
+      setGrievanceSubject("");
+      setGrievanceMessage("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Connection error.");
     } finally {
       setSendingGrievance(false);
     }
@@ -104,154 +191,163 @@ export default function UserDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-steel-light/50 animate-pulse tracking-widest uppercase text-sm">Loading...</div>
+        <div className="text-steel-light/50 animate-pulse tracking-[0.25em] uppercase text-sm">AHEAD · Loading your account</div>
       </div>
     );
   }
-
   if (!user) return null;
 
-  const statusColor = {
-    interested: "text-emerald-400",
-    maybe: "text-amber-400",
-    "not interested": "text-red-400",
-    fulfilled: "text-blue-400",
-  };
-
-  const interestStatus = user.preorder === "yes" ? "interested" : user.preorder === "maybe" ? "maybe" : "not interested";
-  const displayStatus = user.status || interestStatus;
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="container mx-auto flex items-center justify-between px-6 py-4">
-          <a href="/" className="flex items-center gap-3">
-            <img src={aheadLogo} alt="AHEAD" className="h-10 w-auto" />
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-xl">
+        <div className="container mx-auto flex items-center justify-between px-4 py-4 sm:px-6">
+          <a href="/" className="flex items-center gap-3" aria-label="AHEAD home">
+            <img src={aheadLogo} alt="AHEAD Watches" className="h-9 w-auto sm:h-10" />
           </a>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">{user.name}</span>
-            <button
-              onClick={handleLogout}
-              className="text-xs tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors border border-border px-4 py-2 rounded-sm"
-            >
-              Logout
+          <div className="flex items-center gap-3 sm:gap-5">
+            <span className="hidden text-sm text-muted-foreground sm:block">{user.name}</span>
+            <button onClick={handleLogout} className="rounded-sm border border-border px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground transition hover:border-steel/60 hover:text-foreground sm:px-4">
+              Log out
             </button>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-10 max-w-5xl">
-        {/* Welcome */}
+      <main className="container mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
         <ScrollReveal>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mb-10"
-          >
-            <h1 className="font-display text-3xl md:text-4xl font-bold text-gradient-steel mb-2">
-              Welcome, {user.name}
-            </h1>
-            <p className="text-muted-foreground">Your AHEAD dashboard — everything about your waitlist status.</p>
-          </motion.div>
-        </ScrollReveal>
-
-        {/* Status Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
-          <ScrollReveal delay={0}>
-            <GlassCard>
-              <p className="text-xs tracking-widest uppercase text-muted-foreground mb-2">Waitlist Status</p>
-              <p className={`text-xl font-display font-bold capitalize ${statusColor[displayStatus as keyof typeof statusColor] || "text-foreground"}`}>
-                {displayStatus}
-              </p>
-            </GlassCard>
-          </ScrollReveal>
-          <ScrollReveal delay={0.1}>
-            <GlassCard>
-              <p className="text-xs tracking-widest uppercase text-muted-foreground mb-2">Queue Position</p>
-              <p className="text-xl font-display font-bold text-foreground">
-                #{user.position || "—"}
-              </p>
-            </GlassCard>
-          </ScrollReveal>
-          <ScrollReveal delay={0.2}>
-            <GlassCard>
-              <p className="text-xs tracking-widest uppercase text-muted-foreground mb-2">Joined On</p>
-              <p className="text-xl font-display font-bold text-foreground">
-                {new Date(user.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-              </p>
-            </GlassCard>
-          </ScrollReveal>
-        </div>
-
-        {/* Selected Watch */}
-        <ScrollReveal delay={0.1}>
-          <GlassCard className="mb-10">
-            <h2 className="font-display text-xl font-bold text-foreground mb-6">Your Selected Watch</h2>
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="aspect-square rounded-lg overflow-hidden bg-background">
-                <img
-                  src={watchImages[user.model]}
-                  alt={watchNames[user.model]}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="flex flex-col justify-center">
-                <h3 className="font-display text-2xl font-bold text-gradient-steel mb-2">
-                  {watchNames[user.model]}
-                </h3>
-                <p className="text-muted-foreground mb-4">{watchDescriptions[user.model]}</p>
-                <p className="text-steel-light text-lg font-semibold mb-6">
-                  Expected Price: {watchPrices[user.model]}
-                </p>
-                <div>
-                  <p className="text-xs tracking-widest uppercase text-muted-foreground mb-3">Specifications</p>
-                  <ul className="space-y-2">
-                    {watchSpecs[user.model]?.map((spec) => (
-                      <li key={spec} className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="w-1.5 h-1.5 rounded-full bg-steel" />
-                        {spec}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+          <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex flex-col justify-between gap-5 sm:mb-10 sm:flex-row sm:items-end">
+            <div>
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.3em] text-steel-light/70">Your private AHEAD space</p>
+              <h1 className="font-display text-3xl font-bold text-gradient-steel sm:text-4xl">Welcome, {user.name}</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Every timepiece you have your eye on, together in one place. Your waitlist details stay tied to your account.</p>
             </div>
-          </GlassCard>
+            <button onClick={() => setProfileOpen((open) => !open)} className="min-h-11 self-start rounded-sm border border-border px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] transition hover:border-steel/60 sm:self-auto">
+              {profileOpen ? "Close profile editor" : "Edit contact details"}
+            </button>
+          </motion.section>
         </ScrollReveal>
 
-        {/* Grievance Form */}
-        <ScrollReveal delay={0.15}>
+        {profileOpen && (
+          <ScrollReveal>
+            <GlassCard className="mb-8">
+              <h2 className="mb-1 font-display text-xl font-semibold">Your contact details</h2>
+              <p className="mb-5 text-sm text-muted-foreground">Changes apply to all watch models on this account.</p>
+              <form onSubmit={handleProfileSave} className="grid gap-4 md:grid-cols-2">
+                <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                  Full name
+                  <input value={profileName} onChange={(event) => setProfileName(event.target.value)} autoComplete="name" maxLength={100} required className="mt-2 min-h-12 w-full rounded-sm border border-border bg-input px-4 py-3 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                </label>
+                <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                  Phone number
+                  <input value={profilePhone} onChange={(event) => setProfilePhone(event.target.value)} autoComplete="tel" maxLength={30} required className="mt-2 min-h-12 w-full rounded-sm border border-border bg-input px-4 py-3 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring" />
+                </label>
+                <div className="flex items-center justify-between gap-4 md:col-span-2">
+                  <p className="text-xs text-muted-foreground">Email: {user.email} <span className="ml-1">(account identifier)</span></p>
+                  <button type="submit" disabled={savingProfile} className="min-h-11 rounded-sm bg-gradient-steel px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-foreground disabled:opacity-50">
+                    {savingProfile ? "Saving…" : "Save details"}
+                  </button>
+                </div>
+              </form>
+            </GlassCard>
+          </ScrollReveal>
+        )}
+
+        <section className="mb-10 grid gap-4 sm:grid-cols-3">
           <GlassCard>
-            <h2 className="font-display text-xl font-bold text-foreground mb-6">Raise a Grievance</h2>
+            <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Models on your list</p>
+            <p className="font-display text-3xl font-bold">{user.entries.length.toString().padStart(2, "0")}</p>
+          </GlassCard>
+          <GlassCard>
+            <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Account email</p>
+            <p className="break-all text-sm font-medium">{user.email}</p>
+          </GlassCard>
+          <GlassCard>
+            <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Account created</p>
+            <p className="font-display text-xl font-semibold">{formatDate(user.createdAt)}</p>
+          </GlassCard>
+        </section>
+
+        <section className="mb-12">
+          <div className="mb-5 flex items-end justify-between gap-4">
+            <div>
+              <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-steel-light/70">Your selections</p>
+              <h2 className="font-display text-2xl font-semibold sm:text-3xl">Your waitlist</h2>
+            </div>
+            <a href="/#waitlist" className="text-xs text-muted-foreground underline decoration-border underline-offset-4 transition hover:text-foreground">Explore more models</a>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {user.entries.map((entry) => (
+              <ScrollReveal key={entry._id}>
+                <GlassCard className="h-full overflow-hidden !p-0">
+                  <div className="grid sm:grid-cols-[0.85fr_1.15fr]">
+                    <div className="relative min-h-64 bg-background sm:min-h-full">
+                      <img src={watchImages[entry.model] || watchImages["5am"]} alt={watchNames[entry.model] || "AHEAD timepiece"} className="absolute inset-0 h-full w-full object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 pt-12">
+                        <p className="text-[9px] uppercase tracking-[0.22em] text-white/60">Selected timepiece</p>
+                        <h3 className="mt-1 font-display text-xl font-semibold text-white">{watchNames[entry.model] || entry.model}</h3>
+                      </div>
+                    </div>
+                    <div className="p-5 sm:p-6">
+                      <div className="mb-5 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Waitlist position</p>
+                          <p className="mt-1 font-display text-2xl font-bold">#{entry.position || "—"}</p>
+                        </div>
+                        <span className="rounded-full border border-steel/30 px-3 py-1.5 text-[9px] uppercase tracking-[0.14em] text-steel-light">{entry.status === "fulfilled" ? "Fulfilled" : "Pending"}</span>
+                      </div>
+                      <p className="mb-2 text-sm leading-6 text-muted-foreground">{watchDescriptions[entry.model] || "Your selected AHEAD timepiece."}</p>
+                      <p className="mb-4 text-sm font-semibold">{watchPrices[entry.model] || "Price announced at launch"}</p>
+                      <div className="mb-5 border-t border-border pt-4">
+                        <p className="mb-3 text-[9px] uppercase tracking-[0.2em] text-muted-foreground">Specifications</p>
+                        <ul className="space-y-2">
+                          {(watchSpecs[entry.model] || []).map((spec) => (
+                            <li key={spec} className="flex items-start gap-2 text-xs text-muted-foreground"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-steel" />{spec}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <label className="block text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                        Your pre-order interest
+                        <select value={entry.preorder} onChange={(event) => void handleInterestChange(entry, event.target.value as PreorderValue)} disabled={savingEntry !== null} className="mt-2 min-h-11 w-full rounded-sm border border-border bg-input px-3 py-2 text-sm normal-case tracking-normal text-foreground outline-none focus:ring-1 focus:ring-ring disabled:opacity-60">
+                          <option value="not_asked">Not decided</option>
+                          <option value="yes">Interested in pre-order</option>
+                          <option value="maybe">Still deciding</option>
+                          <option value="no">Not interested right now</option>
+                        </select>
+                      </label>
+                      <p className="mt-3 text-[10px] text-muted-foreground/70">Joined {formatDate(entry.createdAt)} · {interestLabels[entry.preorder]}</p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </ScrollReveal>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+          <GlassCard>
+            <p className="mb-3 text-[10px] uppercase tracking-[0.25em] text-steel-light/70">We're here to help</p>
+            <h2 className="mb-3 font-display text-2xl font-semibold">Need a hand?</h2>
+            <p className="text-sm leading-6 text-muted-foreground">Send a message to the AHEAD team about your account or waitlist. We’ll route it to the team for review.</p>
+          </GlassCard>
+          <GlassCard>
+            <h2 className="mb-5 font-display text-xl font-semibold">Contact the AHEAD team</h2>
             <form onSubmit={handleGrievance} className="space-y-4">
-              <input
-                type="text"
-                placeholder="Subject"
-                value={grievanceSubject}
-                onChange={(e) => setGrievanceSubject(e.target.value)}
-                maxLength={200}
-                className="w-full bg-input border border-border rounded-sm px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all"
-              />
-              <textarea
-                placeholder="Describe your issue..."
-                value={grievanceMessage}
-                onChange={(e) => setGrievanceMessage(e.target.value)}
-                maxLength={1000}
-                rows={4}
-                className="w-full bg-input border border-border rounded-sm px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-all resize-none"
-              />
-              <button
-                type="submit"
-                disabled={sendingGrievance}
-                className="bg-gradient-steel text-primary-foreground px-8 py-3 text-sm font-semibold tracking-widest uppercase rounded-sm transition-all duration-300 disabled:opacity-50"
-              >
-                {sendingGrievance ? "Submitting..." : "Submit Grievance"}
+              <label className="block text-xs text-muted-foreground">
+                Subject
+                <input type="text" placeholder="What can we help with?" value={grievanceSubject} onChange={(event) => setGrievanceSubject(event.target.value)} maxLength={200} required className="mt-2 min-h-11 w-full rounded-sm border border-border bg-input px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+              </label>
+              <label className="block text-xs text-muted-foreground">
+                Message
+                <textarea placeholder="Tell us a little more…" value={grievanceMessage} onChange={(event) => setGrievanceMessage(event.target.value)} maxLength={1000} rows={4} required className="mt-2 w-full resize-y rounded-sm border border-border bg-input px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+              </label>
+              <button type="submit" disabled={sendingGrievance} className="min-h-11 rounded-sm bg-gradient-steel px-6 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-foreground disabled:opacity-50">
+                {sendingGrievance ? "Sending…" : "Send message"}
               </button>
             </form>
           </GlassCard>
-        </ScrollReveal>
-      </div>
+        </section>
+      </main>
+      <footer className="border-t border-border px-4 py-6 text-center text-[9px] uppercase tracking-[0.22em] text-muted-foreground/60">AHEAD Watches · Be Ahead Of Time</footer>
     </div>
   );
 }
