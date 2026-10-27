@@ -448,7 +448,7 @@ app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
     }
 
     // Reuse the existing account password when this email joins another model.
-    const password = existingEmailEntry ? null : crypto.randomBytes(24).toString("hex");
+    const password = existingEmailEntry?.password ? null : crypto.randomBytes(24).toString("hex");
     const passwordHash = existingEmailEntry?.password || await hashPassword(password);
 
     await Waitlist.create({ name, phone, email, model, preorder, password: passwordHash });
