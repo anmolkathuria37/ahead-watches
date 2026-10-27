@@ -36,7 +36,12 @@ app.use(
   cors({
     origin: (origin, cb) => {
       // Non-browser/server-to-server requests may not send an Origin header.
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      // Allow only this project's Vercel preview hostname pattern; do not trust
+      // arbitrary *.vercel.app origins.
+      const isTrustedAheadPreview =
+        typeof origin === "string" &&
+        /^https:\/\/ahead-watches(?:-[a-z0-9-]+)?-anmol-kathurias-projects\.vercel\.app$/.test(origin);
+      if (!origin || allowedOrigins.includes(origin) || isTrustedAheadPreview) return cb(null, true);
       return cb(new Error("Origin not allowed by CORS"));
     },
     credentials: true,
