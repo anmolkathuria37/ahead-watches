@@ -84,7 +84,8 @@ const WaitlistSection = () => {
       });
 
       if (response.status === 409) {
-        toast.error("This email is already on the AHEAD waitlist.");
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.message || "You're already on the waitlist for this watch model.");
         return;
       }
       if (!response.ok) {
