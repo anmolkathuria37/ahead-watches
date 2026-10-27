@@ -709,6 +709,12 @@ app.put("/api/user/waitlist/:id", userAuth, async (req, res) => {
 
     return res.json({ message: "Waitlist preference updated", entry });
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({
+        code: "WAITLIST_MODEL_EXISTS",
+        message: "You're already on the waitlist for this watch model.",
+      });
+    }
     console.error("User waitlist update failed:", err.message);
     return res.status(500).json({ message: "Could not update your waitlist preference." });
   }
