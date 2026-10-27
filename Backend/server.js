@@ -627,6 +627,29 @@ app.put("/api/user/profile", userAuth, async (req, res) => {
   }
 });
 
+app.put("/api/user/password", userAuth, async (req, res) => {
+  try {
+    const currentPassword = typeof req.body?.currentPassword === "string" ? req.body.currentPassword : "";
+    const newPassword = typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+    if (!currentPassword || newPassword.length < 12 || newPassword.length > 128) {
+      return res.status(400).json({ message: "Enter your current password and a new password of 12–128 characters." });
+    }
+
+    const query = req.userEmail ? { email: req.userEmail } : { _id: req.userId };
+    const user = await Waitlist.findOne(query);
+    if (!user || !(await verifyPassword(currentPassword, user.password))) {
+      return res.status(401).json({ message: "Your current password is incorrect." });
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await Waitlist.updateMany(query, { $set: { password: passwordHash } });
+    return res.json({ message: "Password changed successfully." });
+  } catch (err) {
+    console.error("Password update failed:", err.message);
+    return res.status(500).json({ message: "Could not change your password." });
+  }
+});
+
 // Users may update their interest for their own model entries, but not admin-controlled status.
 app.put("/api/user/waitlist/:id", userAuth, async (req, res) => {
   try {
