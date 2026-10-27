@@ -64,7 +64,7 @@ const WaitlistConfirmation: React.FC<WaitlistConfirmationProps> = ({ name, email
       id="waitlist"
       aria-labelledby="waitlist-confirmation-title"
       aria-live="polite"
-      className="relative isolate min-h-[80vh] overflow-hidden bg-[#080a0e] px-5 py-16 sm:px-8 sm:py-24"
+      className="relative isolate min-h-[100svh] overflow-hidden bg-[#080a0e] px-5 py-8 sm:px-8 sm:py-10 lg:h-svh lg:min-h-[680px] lg:overflow-y-auto"
     >
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute left-1/2 top-0 h-[520px] w-[760px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgba(201,181,141,0.10)_0%,rgba(201,181,141,0.025)_42%,transparent_72%)]" />
@@ -76,9 +76,9 @@ const WaitlistConfirmation: React.FC<WaitlistConfirmationProps> = ({ name, email
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.65, ease: "easeOut" }}
-        className="mx-auto max-w-5xl"
+        className="mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl flex-col justify-center lg:min-h-[calc(100svh-5rem)]"
       >
-        <div className="mb-10 flex items-center justify-center gap-3 sm:mb-14">
+        <div className="mb-6 flex items-center justify-center gap-3 sm:mb-8">
           <span className="h-px w-8 bg-[#c9b58d]/50" />
           <span className="text-[9px] font-medium uppercase tracking-[0.34em] text-[#c9b58d] sm:text-[10px]">
             AHEAD · Private access
@@ -86,32 +86,32 @@ const WaitlistConfirmation: React.FC<WaitlistConfirmationProps> = ({ name, email
           <span className="h-px w-8 bg-[#c9b58d]/50" />
         </div>
 
-        <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+        <div className="grid items-center gap-7 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 xl:gap-14">
           <div className="text-center lg:text-left">
             <motion.div
               initial={{ scale: 0.85, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.12, duration: 0.45 }}
-              className="mx-auto mb-7 flex h-14 w-14 items-center justify-center rounded-full border border-[#c9b58d]/45 bg-[#c9b58d]/[0.07] text-[#e7d6b1] shadow-[0_0_45px_-18px_rgba(201,181,141,0.65)] lg:mx-0"
+              className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full border border-[#c9b58d]/45 bg-[#c9b58d]/[0.07] text-[#e7d6b1] shadow-[0_0_45px_-18px_rgba(201,181,141,0.65)] lg:mx-0"
             >
               <Check aria-hidden="true" size={24} strokeWidth={1.5} />
             </motion.div>
 
-            <p className="mb-4 text-[9px] font-medium uppercase tracking-[0.24em] text-white/45">
+            <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.24em] text-white/45">
               Your next chapter starts now
             </p>
             <h1
               id="waitlist-confirmation-title"
-              className="font-display text-4xl font-medium leading-[1.08] tracking-[-0.045em] text-[#f0eee8] sm:text-5xl md:text-6xl"
+              className="font-display text-4xl font-medium leading-[1.04] tracking-[-0.045em] text-[#f0eee8] sm:text-5xl xl:text-6xl"
             >
               You’re on the list.
               <span className="mt-2 block text-gradient-steel">Stay ahead, {name.trim().split(/\s+/)[0]}.</span>
             </h1>
-            <p className="mx-auto mt-6 max-w-lg text-sm leading-7 text-white/55 sm:text-base lg:mx-0">
+            <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-white/55 sm:text-base sm:leading-7 lg:mx-0">
               Your interest in AHEAD has been recorded. Thank you for being part of what comes next—we’ll keep you informed as early access approaches.
             </p>
 
-            <div className="mx-auto mt-8 flex max-w-md flex-col gap-3 border-y border-white/[0.09] py-5 text-left sm:flex-row sm:items-start sm:gap-4 lg:mx-0">
+            <div className="mx-auto mt-5 flex max-w-md flex-col gap-3 border-y border-white/[0.09] py-5 text-left sm:flex-row sm:items-start sm:gap-4 lg:mx-0">
               <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.035] text-[#c9b58d]">
                 <Mail aria-hidden="true" size={16} strokeWidth={1.6} />
               </div>
@@ -121,7 +121,7 @@ const WaitlistConfirmation: React.FC<WaitlistConfirmationProps> = ({ name, email
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[10px] uppercase tracking-[0.12em] text-white/45 lg:justify-start">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[10px] uppercase tracking-[0.12em] text-white/45 lg:justify-start">
               <span className="inline-flex items-center gap-2"><ShieldCheck size={14} className="text-[#c9b58d]" /> No payment taken</span>
               <span className="inline-flex items-center gap-2"><Sparkles size={14} className="text-[#c9b58d]" /> Launch updates only</span>
             </div>
@@ -131,18 +131,18 @@ const WaitlistConfirmation: React.FC<WaitlistConfirmationProps> = ({ name, email
             initial={{ opacity: 0, x: 16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.16, duration: 0.65, ease: "easeOut" }}
-            className="relative mx-auto w-full max-w-md"
+            className="relative mx-auto w-full max-w-md lg:max-w-none"
           >
             <div className="absolute -inset-3 rounded-[1.4rem] border border-[#c9b58d]/10" />
             <div className="relative overflow-hidden rounded-2xl border border-white/[0.12] bg-[#0d1015] shadow-[0_35px_100px_-45px_rgba(0,0,0,0.95)]">
-              <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4">
+              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3 sm:px-5">
                 <span className="text-[9px] uppercase tracking-[0.22em] text-white/45">Your selected timepiece</span>
                 <span className="inline-flex items-center gap-1.5 text-[9px] uppercase tracking-[0.15em] text-[#c9b58d]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#c9b58d]" /> Saved
                 </span>
               </div>
 
-              <div className="relative aspect-[4/3] overflow-hidden bg-[#11151b]">
+              <div className="relative aspect-[16/9] overflow-hidden bg-[#11151b] sm:aspect-[2/1] lg:aspect-[16/7]">
                 <img
                   src={watch.image}
                   alt={watch.name}
@@ -152,20 +152,20 @@ const WaitlistConfirmation: React.FC<WaitlistConfirmationProps> = ({ name, email
                 <span className="absolute bottom-4 left-5 text-[8px] uppercase tracking-[0.24em] text-white/65">{watch.edition}</span>
               </div>
 
-              <div className="p-5 sm:p-6">
+              <div className="p-4 sm:p-5">
                 <h2 className="font-display text-2xl font-medium tracking-tight text-[#f0eee8]">{watch.name}</h2>
                 <p className="mt-2 text-[10px] uppercase tracking-[0.17em] text-[#c9b58d]/80">{watch.description}</p>
 
-                <div className="my-6 h-px bg-gradient-to-r from-[#c9b58d]/50 via-white/10 to-transparent" />
+                <div className="my-4 h-px bg-gradient-to-r from-[#c9b58d]/50 via-white/10 to-transparent" />
 
-                <p className="mb-4 text-[9px] uppercase tracking-[0.22em] text-white/40">What happens next</p>
-                <ol className="space-y-4">
+                <p className="mb-3 text-[9px] uppercase tracking-[0.22em] text-white/40">What happens next</p>
+                <ol className="space-y-2.5">
                   {nextSteps.map((step, index) => (
                     <li key={step.number} className="flex gap-3">
                       <span className="mt-0.5 text-[10px] tabular-nums text-[#c9b58d]">{step.number}</span>
                       <div>
                         <p className="text-xs font-medium text-white/85">{step.title}</p>
-                        <p className="mt-1 text-[11px] leading-5 text-white/45">{step.detail}</p>
+                        <p className="mt-0.5 text-[10px] leading-4 text-white/45">{step.detail}</p>
                       </div>
                       {index === 0 && <Check aria-hidden="true" size={14} className="ml-auto mt-0.5 shrink-0 text-[#c9b58d]" />}
                     </li>
@@ -174,14 +174,14 @@ const WaitlistConfirmation: React.FC<WaitlistConfirmationProps> = ({ name, email
 
                 <a
                   href="#collection"
-                  className="group mt-7 inline-flex min-h-11 w-full items-center justify-between border border-white/[0.13] px-4 py-3 text-[9px] font-medium uppercase tracking-[0.2em] text-[#e8e3d7] transition-colors hover:border-[#c9b58d]/50 hover:bg-[#c9b58d]/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c9b58d]"
+                  className="group mt-4 inline-flex min-h-11 w-full items-center justify-between border border-white/[0.13] px-4 py-3 text-[9px] font-medium uppercase tracking-[0.2em] text-[#e8e3d7] transition-colors hover:border-[#c9b58d]/50 hover:bg-[#c9b58d]/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c9b58d]"
                 >
                   Continue exploring AHEAD
                   <ArrowRight aria-hidden="true" size={15} className="transition-transform group-hover:translate-x-1" />
                 </a>
               </div>
             </div>
-            <p className="mt-5 text-center text-[9px] uppercase tracking-[0.2em] text-white/30">Be ahead of time · AHEAD Watches</p>
+            <p className="mt-3 text-center text-[9px] uppercase tracking-[0.2em] text-white/30">Be ahead of time · AHEAD Watches</p>
           </motion.div>
         </div>
       </motion.div>
