@@ -309,6 +309,7 @@ const sendConfirmation = async (email, name, model) => {
   });
   if (success) console.log("📨 Confirmation email sent:", email);
   else console.error("❌ Confirmation email failed after all retries:", email);
+  return success;
 };
 
 const sendPasswordEmail = async (email, name, password) => {
@@ -339,6 +340,7 @@ const sendPasswordEmail = async (email, name, password) => {
   });
   if (success) console.log("📨 Password email sent:", email);
   else console.error("❌ Password email failed after all retries:", email);
+  return success;
 };
 
 const sendGrievanceNotification = async (userName, userEmail, subject, message) => {
@@ -464,14 +466,27 @@ app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
     const password = existingEmailEntry?.password ? null : crypto.randomBytes(24).toString("hex");
     const passwordHash = existingEmailEntry?.password || await hashPassword(password);
 
-    await Waitlist.create({ name, phone, email, model, preorder, password: passwordHash });
+    const createdEntry = await Waitlist.create({ name, phone, email, model, preorder, password: passwordHash });
 
-    // Send model confirmation for each new model; send account credentials only once.
-    sendConfirmation(email, name, model);
-    if (password) sendPasswordEmail(email, name, password);
+    // Wait for email providers so the UI can report delivery accurately.
+    const confirmationSent = await sendConfirmation(email, name, model);
+    const credentialsSent = password ? await sendPasswordEmail(email, name, password) : true;
     sendWhatsAppConfirmation({ phone, name });
 
-    return res.status(201).json({ message: "Successfully joined waitlist" });
+    // If the first account's credentials cannot be delivered, remove the new account
+    // so the visitor can retry instead of being stranded without login access.
+    if (password && !credentialsSent) {
+      await Waitlist.deleteOne({ _id: createdEntry._id });
+      return res.status(502).json({
+        code: "CREDENTIAL_EMAIL_FAILED",
+        message: "We couldn't deliver your login details. Please try again in a moment.",
+      });
+    }
+
+    return res.status(201).json({
+      message: "Successfully joined waitlist",
+      emailDelivery: confirmationSent ? "sent" : "partial",
+    });
   } catch (err) {
     if (err.code === 11000)
       return res.status(409).json({
@@ -594,9 +609,12 @@ app.put("/api/user/waitlist/:id", userAuth, async (req, res) => {
       return res.status(400).json({ message: "Choose a valid interest option." });
     }
 
+    if (!req.userEmail && String(req.params.id) !== String(req.userId)) {
+      return res.status(404).json({ message: "Waitlist entry not found." });
+    }
     const query = req.userEmail
       ? { _id: req.params.id, email: req.userEmail }
-      : { _id: req.params.id, _id: req.userId };
+      : { _id: req.userId };
     const entry = await Waitlist.findOneAndUpdate(
       query,
       { $set: { preorder } },
