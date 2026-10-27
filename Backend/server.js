@@ -36,7 +36,12 @@ app.use(
   cors({
     origin: (origin, cb) => {
       // Non-browser/server-to-server requests may not send an Origin header.
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      // Allow only this project's Vercel preview hostname pattern; do not trust
+      // arbitrary *.vercel.app origins.
+      const isTrustedAheadPreview =
+        typeof origin === "string" &&
+        /^https:\/\/ahead-watches(?:-[a-z0-9-]+)?-anmol-kathurias-projects\.vercel\.app$/.test(origin);
+      if (!origin || allowedOrigins.includes(origin) || isTrustedAheadPreview) return cb(null, true);
       return cb(new Error("Origin not allowed by CORS"));
     },
     credentials: true,
@@ -255,6 +260,7 @@ const WATCH_DATA = {
 /* =======================
    Email Templates
 ======================= */
+const FRONTEND_URL = (process.env.FRONTEND_URL || "https://beaheadoftime.vercel.app").replace(/\/$/, "");
 const sendConfirmation = async (email, name, model) => {
   const watch = WATCH_DATA[model] || WATCH_DATA["5am"];
   const success = await sendMailWithRetry({
@@ -293,8 +299,8 @@ const sendConfirmation = async (email, name, model) => {
             
             <!-- Dashboard CTA -->
             <div style="text-align:center; margin:32px 0;">
-              <p style="color:#6060778; font-size:13px; margin:0 0 16px;">Your login credentials have been sent in a separate email.</p>
-              <a href="https://aheadwatches.com/login" style="display:inline-block; background:linear-gradient(135deg,#808098,#b0b0c0); color:#0a0a12; padding:12px 32px; text-decoration:none; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-weight:600; border-radius:4px;">Access Dashboard</a>
+              <p style="color:#606078; font-size:13px; margin:0 0 16px;">Your login credentials have been sent in a separate email.</p>
+              <a href="${FRONTEND_URL}/login" style="display:inline-block; background:linear-gradient(135deg,#808098,#b0b0c0); color:#0a0a12; padding:12px 32px; text-decoration:none; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-weight:600; border-radius:4px;">Access Dashboard</a>
             </div>
           </div>
           
@@ -309,6 +315,7 @@ const sendConfirmation = async (email, name, model) => {
   });
   if (success) console.log("📨 Confirmation email sent:", email);
   else console.error("❌ Confirmation email failed after all retries:", email);
+  return success;
 };
 
 const sendPasswordEmail = async (email, name, password) => {
@@ -339,6 +346,7 @@ const sendPasswordEmail = async (email, name, password) => {
   });
   if (success) console.log("📨 Password email sent:", email);
   else console.error("❌ Password email failed after all retries:", email);
+  return success;
 };
 
 const sendGrievanceNotification = async (userName, userEmail, subject, message) => {
@@ -398,12 +406,25 @@ const hashPassword = (password) =>
   });
 
 const verifyPassword = async (password, storedPassword) => {
-  if (typeof storedPassword !== "string") return false;
-  if (!storedPassword.startsWith("scrypt$")) {
-    if (!storedPassword.length || password.length !== storedPassword.length) return false;
-    return crypto.timingSafeEqual(Buffer.from(password), Buffer.from(storedPassword));
+  if (typeof storedPassword !== "string" || !storedPassword) return false;
+
+  // Current format: scrypt$<32-char salt>$<128-char hash>.
+  // Also verify the legacy format emitted by earlier deployments: scrypt<salt><hash>.
+  let salt;
+  let expectedHex;
+  if (storedPassword.startsWith("scrypt$")) {
+    [, salt, expectedHex] = storedPassword.split("$");
+  } else {
+    const legacyMatch = storedPassword.match(/^scrypt([a-f0-9]{32})([a-f0-9]{128})$/i);
+    if (legacyMatch) {
+      [, salt, expectedHex] = legacyMatch;
+    } else {
+      // Temporary compatibility for any genuinely legacy plaintext records.
+      if (password.length !== storedPassword.length) return false;
+      return crypto.timingSafeEqual(Buffer.from(password), Buffer.from(storedPassword));
+    }
   }
-  const [, salt, expectedHex] = storedPassword.split("$");
+
   if (!salt || !expectedHex || !/^[a-f0-9]{128}$/i.test(expectedHex)) return false;
   const actual = await new Promise((resolve, reject) =>
     crypto.scrypt(password, salt, 64, (err, key) => err ? reject(err) : resolve(key))
@@ -451,14 +472,27 @@ app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
     const password = existingEmailEntry?.password ? null : crypto.randomBytes(24).toString("hex");
     const passwordHash = existingEmailEntry?.password || await hashPassword(password);
 
-    await Waitlist.create({ name, phone, email, model, preorder, password: passwordHash });
+    const createdEntry = await Waitlist.create({ name, phone, email, model, preorder, password: passwordHash });
 
-    // Send model confirmation for each new model; send account credentials only once.
-    sendConfirmation(email, name, model);
-    if (password) sendPasswordEmail(email, name, password);
+    // Wait for email providers so the UI can report delivery accurately.
+    const confirmationSent = await sendConfirmation(email, name, model);
+    const credentialsSent = password ? await sendPasswordEmail(email, name, password) : true;
     sendWhatsAppConfirmation({ phone, name });
 
-    return res.status(201).json({ message: "Successfully joined waitlist" });
+    // If the first account's credentials cannot be delivered, remove the new account
+    // so the visitor can retry instead of being stranded without login access.
+    if (password && !credentialsSent) {
+      await Waitlist.deleteOne({ _id: createdEntry._id });
+      return res.status(502).json({
+        code: "CREDENTIAL_EMAIL_FAILED",
+        message: "We couldn't deliver your login details. Please try again in a moment.",
+      });
+    }
+
+    return res.status(201).json({
+      message: "Successfully joined waitlist",
+      emailDelivery: confirmationSent ? "sent" : "partial",
+    });
   } catch (err) {
     if (err.code === 11000)
       return res.status(409).json({
@@ -493,6 +527,11 @@ app.post("/api/user/login", rateLimit(60000, 10), async (req, res) => {
     if (!user.password.startsWith("scrypt$")) {
       user.password = await hashPassword(password);
       await user.save();
+      // Keep all model entries for this email on the same account password.
+      await Waitlist.updateMany(
+        { email: user.email, _id: { $ne: user._id } },
+        { $set: { password: user.password } }
+      );
     }
 
     const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -500,6 +539,38 @@ app.post("/api/user/login", rateLimit(60000, 10), async (req, res) => {
   } catch (err) {
     console.error("❌ User login error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Email-based recovery without revealing whether an address has an account.
+app.post("/api/user/forgot-password", rateLimit(60000, 3), async (req, res) => {
+  const genericMessage = "If an account exists for that email, login details will be sent shortly.";
+  try {
+    const email = sanitize(req.body?.email).toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.json({ message: genericMessage });
+    }
+
+    const user = await Waitlist.findOne({ email });
+    if (user) {
+      const temporaryPassword = crypto.randomBytes(24).toString("hex");
+      const previousPasswordHash = user.password;
+      const passwordHash = await hashPassword(temporaryPassword);
+      await Waitlist.updateMany({ email }, { $set: { password: passwordHash } });
+
+      const emailSent = await sendPasswordEmail(email, user.name, temporaryPassword);
+      if (emailSent) {
+        console.log("🔐 Login recovery completed for:", email);
+      } else {
+        // Keep the existing login working if the recovery email cannot be delivered.
+        await Waitlist.updateMany({ email }, { $set: { password: previousPasswordHash } });
+        console.error("❌ Login recovery email could not be delivered:", email);
+      }
+    }
+    return res.json({ message: genericMessage });
+  } catch (err) {
+    console.error("Login recovery failed:", err.message);
+    return res.json({ message: genericMessage });
   }
 });
 
@@ -513,6 +584,7 @@ const userAuth = (req, res, next) => {
   try {
     const decoded = jwt.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
     req.userId = decoded.userId;
+    req.userEmail = typeof decoded.email === "string" ? decoded.email.toLowerCase() : null;
     next();
   } catch {
     return res.status(403).json({ message: "Invalid token" });
@@ -524,14 +596,131 @@ const userAuth = (req, res, next) => {
 ======================= */
 app.get("/api/user/me", userAuth, async (req, res) => {
   try {
-    const user = await Waitlist.findById(req.userId).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const query = req.userEmail ? { email: req.userEmail } : { _id: req.userId };
+    const entries = await Waitlist.find(query).select("-password").sort({ createdAt: 1 });
+    if (entries.length === 0) return res.status(404).json({ message: "User not found" });
 
-    const position = await Waitlist.countDocuments({ createdAt: { $lte: user.createdAt } });
+    const entriesWithPositions = await Promise.all(entries.map(async (entry) => ({
+      ...entry.toObject(),
+      position: await Waitlist.countDocuments({ createdAt: { $lte: entry.createdAt } }),
+    })));
+    const primaryEntry = entriesWithPositions[0];
 
-    return res.json({ ...user.toObject(), position });
+    return res.json({
+      ...primaryEntry,
+      entries: entriesWithPositions,
+      position: primaryEntry.position,
+    });
   } catch (err) {
+    console.error("User profile fetch failed:", err.message);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Users may edit their own contact details across all their model entries.
+app.put("/api/user/profile", userAuth, async (req, res) => {
+  try {
+    const name = sanitize(req.body?.name);
+    const phone = sanitize(req.body?.phone);
+    if (!name || name.length > 100) return res.status(400).json({ message: "Enter a valid name (max 100 characters)." });
+    if (!phone || phone.length > 30) return res.status(400).json({ message: "Enter a valid phone number (max 30 characters)." });
+
+    const query = req.userEmail ? { email: req.userEmail } : { _id: req.userId };
+    const result = await Waitlist.updateMany(query, { $set: { name, phone } });
+    if (!result.matchedCount) return res.status(404).json({ message: "User not found" });
+
+    return res.json({ message: "Profile updated", name, phone });
+  } catch (err) {
+    console.error("User profile update failed:", err.message);
+    return res.status(500).json({ message: "Could not update your profile." });
+  }
+});
+
+app.put("/api/user/password", userAuth, async (req, res) => {
+  try {
+    const currentPassword = typeof req.body?.currentPassword === "string" ? req.body.currentPassword : "";
+    const newPassword = typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+    if (!currentPassword || newPassword.length < 12 || newPassword.length > 128) {
+      return res.status(400).json({ message: "Enter your current password and a new password of 12–128 characters." });
+    }
+
+    const query = req.userEmail ? { email: req.userEmail } : { _id: req.userId };
+    const user = await Waitlist.findOne(query);
+    if (!user || !(await verifyPassword(currentPassword, user.password))) {
+      return res.status(401).json({ message: "Your current password is incorrect." });
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await Waitlist.updateMany(query, { $set: { password: passwordHash } });
+    return res.json({ message: "Password changed successfully." });
+  } catch (err) {
+    console.error("Password update failed:", err.message);
+    return res.status(500).json({ message: "Could not change your password." });
+  }
+});
+
+// Users may update their interest for their own model entries, but not admin-controlled status.
+app.put("/api/user/waitlist/:id", userAuth, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid waitlist entry." });
+    }
+    const updates = {};
+    if (req.body?.preorder !== undefined) {
+      const preorder = sanitize(req.body.preorder);
+      if (!["yes", "maybe", "no", "not_asked"].includes(preorder)) {
+        return res.status(400).json({ message: "Choose a valid interest option." });
+      }
+      updates.preorder = preorder;
+    }
+    if (req.body?.model !== undefined) {
+      const model = sanitize(req.body.model);
+      if (!["5am", "founder", "midnight"].includes(model)) {
+        return res.status(400).json({ message: "Choose a valid watch model." });
+      }
+      updates.model = model;
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No editable waitlist fields provided." });
+    }
+
+    if (!req.userEmail && String(req.params.id) !== String(req.userId)) {
+      return res.status(404).json({ message: "Waitlist entry not found." });
+    }
+    if (updates.model && req.userEmail) {
+      const duplicateModel = await Waitlist.findOne({
+        email: req.userEmail,
+        model: updates.model,
+        _id: { $ne: req.params.id },
+      }).select("_id");
+      if (duplicateModel) {
+        return res.status(409).json({
+          code: "WAITLIST_MODEL_EXISTS",
+          message: "You're already on the waitlist for this watch model.",
+        });
+      }
+    }
+
+    const query = req.userEmail
+      ? { _id: req.params.id, email: req.userEmail }
+      : { _id: req.userId };
+    const entry = await Waitlist.findOneAndUpdate(
+      query,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select("-password");
+    if (!entry) return res.status(404).json({ message: "Waitlist entry not found." });
+
+    return res.json({ message: "Waitlist preference updated", entry });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({
+        code: "WAITLIST_MODEL_EXISTS",
+        message: "You're already on the waitlist for this watch model.",
+      });
+    }
+    console.error("User waitlist update failed:", err.message);
+    return res.status(500).json({ message: "Could not update your waitlist preference." });
   }
 });
 
@@ -542,7 +731,9 @@ app.post("/api/user/grievance", userAuth, rateLimit(60000, 3), async (req, res) 
     if (!subject || !message) return res.status(400).json({ message: "All fields required" });
     if (subject.length > 200 || message.length > 1000) return res.status(400).json({ message: "Input too long" });
 
-    const user = await Waitlist.findById(req.userId);
+    const user = req.userEmail
+      ? await Waitlist.findOne({ email: req.userEmail })
+      : await Waitlist.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     await Grievance.create({

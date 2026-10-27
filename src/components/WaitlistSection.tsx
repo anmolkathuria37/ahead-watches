@@ -87,9 +87,12 @@ const WaitlistSection = () => {
         toast.error("You're already on the waitlist for this watch model.");
         return;
       }
+      const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || "We couldn’t submit your request. Please try again.");
+        throw new Error(result.message || "We couldn’t submit your request. Please try again.");
+      }
+      if (result.emailDelivery === "partial") {
+        toast.warning("Your waitlist place is saved, but the confirmation email couldn't be delivered. Please check back later.");
       }
       setSubmitted(true);
     } catch (error) {
