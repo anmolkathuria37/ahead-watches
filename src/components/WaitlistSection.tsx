@@ -84,7 +84,7 @@ const WaitlistSection = () => {
       });
 
       if (response.status === 409) {
-        toast.error("This email is already on the AHEAD waitlist.");
+        toast.error("You're already on the waitlist for this watch model.");
         return;
       }
       if (!response.ok) {
@@ -99,7 +99,7 @@ const WaitlistSection = () => {
     }
   };
 
-  if (submitted) return <WaitlistConfirmation name={form.name} />;
+  if (submitted) return <WaitlistConfirmation name={form.name} email={form.email} model={form.model} />;
 
   return (
     <section id="waitlist" ref={ref} className="scroll-mt-20 bg-gradient-dark px-5 py-24 sm:px-8 sm:py-32">
