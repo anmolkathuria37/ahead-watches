@@ -554,12 +554,16 @@ app.post("/api/user/forgot-password", rateLimit(60000, 3), async (req, res) => {
     const user = await Waitlist.findOne({ email });
     if (user) {
       const temporaryPassword = crypto.randomBytes(24).toString("hex");
+      const previousPasswordHash = user.password;
+      const passwordHash = await hashPassword(temporaryPassword);
+      await Waitlist.updateMany({ email }, { $set: { password: passwordHash } });
+
       const emailSent = await sendPasswordEmail(email, user.name, temporaryPassword);
       if (emailSent) {
-        const passwordHash = await hashPassword(temporaryPassword);
-        await Waitlist.updateMany({ email }, { $set: { password: passwordHash } });
         console.log("🔐 Login recovery completed for:", email);
       } else {
+        // Keep the existing login working if the recovery email cannot be delivered.
+        await Waitlist.updateMany({ email }, { $set: { password: previousPasswordHash } });
         console.error("❌ Login recovery email could not be delivered:", email);
       }
     }
