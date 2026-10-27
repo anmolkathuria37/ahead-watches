@@ -121,16 +121,16 @@ const WaitlistSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 100 },
     phone: { type: String, required: true, trim: true },
-    email: { type: String, required: true, lowercase: true, unique: true, trim: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
     model: { type: String, required: true, enum: ["5am", "founder", "midnight"] },
     preorder: { type: String, required: true, default: "not_asked", enum: ["yes", "maybe", "no", "not_asked"] },
     status: { type: String, default: "pending", enum: ["pending", "fulfilled"] },
     password: { type: String },
   },
-  { timestamps: true }
+  { timestamps: true, autoIndex: false }
 );
 
-WaitlistSchema.index({ email: 1 });
+WaitlistSchema.index({ email: 1, model: 1 }, { unique: true, name: "email_1_model_1" });
 WaitlistSchema.index({ createdAt: 1 });
 WaitlistSchema.index({ model: 1, preorder: 1 });
 
@@ -147,6 +147,32 @@ const GrievanceSchema = new mongoose.Schema(
 
 const Waitlist = mongoose.model("Waitlist", WaitlistSchema);
 const Grievance = mongoose.model("Grievance", GrievanceSchema);
+
+// Replace the legacy unique-email index with a unique email+model index.
+// This allows one person to join multiple model waitlists, but prevents
+// duplicate entries for the same model. Requests wait for this migration.
+const waitlistIndexesReady = (async () => {
+  await Waitlist.init();
+  const indexes = await Waitlist.collection.indexes();
+  const legacyUniqueEmailIndex = indexes.find(
+    (index) =>
+      index.unique &&
+      index.key &&
+      Object.keys(index.key).length === 1 &&
+      index.key.email === 1
+  );
+  if (legacyUniqueEmailIndex) {
+    await Waitlist.collection.dropIndex(legacyUniqueEmailIndex.name);
+    console.log("✅ Removed legacy unique-email waitlist index");
+  }
+  await Waitlist.collection.createIndex(
+    { email: 1, model: 1 },
+    { unique: true, name: "email_1_model_1" }
+  );
+  await Waitlist.collection.createIndex({ createdAt: 1 });
+  await Waitlist.collection.createIndex({ model: 1, preorder: 1 });
+  console.log("✅ Waitlist indexes ready (unique per email + model)");
+})();
 
 /* =======================
    Nodemailer Setup
@@ -390,6 +416,7 @@ const verifyPassword = async (password, storedPassword) => {
 ======================= */
 app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
   try {
+    await waitlistIndexesReady;
     const name = sanitize(req.body.name);
     const phone = sanitize(req.body.phone);
     const email = sanitize(req.body.email).toLowerCase();
@@ -412,20 +439,32 @@ app.post("/api/waitlist", rateLimit(60000, 5), async (req, res) => {
       return res.status(400).json({ message: "Invalid preorder value" });
     }
 
-    const password = crypto.randomBytes(24).toString("hex");
-    const passwordHash = await hashPassword(password);
+    const existingEmailEntry = await Waitlist.findOne({ email });
+    if (existingEmailEntry?.model === model) {
+      return res.status(409).json({
+        code: "WAITLIST_MODEL_EXISTS",
+        message: "This email is already on the waitlist for this watch model.",
+      });
+    }
+
+    // Reuse the existing account password when this email joins another model.
+    const password = existingEmailEntry ? null : crypto.randomBytes(24).toString("hex");
+    const passwordHash = existingEmailEntry?.password || await hashPassword(password);
 
     await Waitlist.create({ name, phone, email, model, preorder, password: passwordHash });
 
-    // Send confirmations (non-blocking)
+    // Send model confirmation for each new model; send account credentials only once.
     sendConfirmation(email, name, model);
-    sendPasswordEmail(email, name, password);
+    if (password) sendPasswordEmail(email, name, password);
     sendWhatsAppConfirmation({ phone, name });
 
     return res.status(201).json({ message: "Successfully joined waitlist" });
   } catch (err) {
     if (err.code === 11000)
-      return res.status(409).json({ message: "Email already exists" });
+      return res.status(409).json({
+        code: "WAITLIST_MODEL_EXISTS",
+        message: "This email is already on the waitlist for this watch model.",
+      });
 
     console.error("❌ Waitlist error:", err);
     res.status(500).json({ message: "Server error" });
