@@ -661,20 +661,48 @@ app.put("/api/user/waitlist/:id", userAuth, async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({ message: "Invalid waitlist entry." });
     }
-    const preorder = sanitize(req.body?.preorder);
-    if (!["yes", "maybe", "no", "not_asked"].includes(preorder)) {
-      return res.status(400).json({ message: "Choose a valid interest option." });
+    const updates = {};
+    if (req.body?.preorder !== undefined) {
+      const preorder = sanitize(req.body.preorder);
+      if (!["yes", "maybe", "no", "not_asked"].includes(preorder)) {
+        return res.status(400).json({ message: "Choose a valid interest option." });
+      }
+      updates.preorder = preorder;
+    }
+    if (req.body?.model !== undefined) {
+      const model = sanitize(req.body.model);
+      if (!["5am", "founder", "midnight"].includes(model)) {
+        return res.status(400).json({ message: "Choose a valid watch model." });
+      }
+      updates.model = model;
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No editable waitlist fields provided." });
     }
 
     if (!req.userEmail && String(req.params.id) !== String(req.userId)) {
       return res.status(404).json({ message: "Waitlist entry not found." });
     }
+    if (updates.model && req.userEmail) {
+      const duplicateModel = await Waitlist.findOne({
+        email: req.userEmail,
+        model: updates.model,
+        _id: { $ne: req.params.id },
+      }).select("_id");
+      if (duplicateModel) {
+        return res.status(409).json({
+          code: "WAITLIST_MODEL_EXISTS",
+          message: "You're already on the waitlist for this watch model.",
+        });
+      }
+    }
+
     const query = req.userEmail
       ? { _id: req.params.id, email: req.userEmail }
       : { _id: req.userId };
     const entry = await Waitlist.findOneAndUpdate(
       query,
-      { $set: { preorder } },
+      { $set: updates },
       { new: true, runValidators: true }
     ).select("-password");
     if (!entry) return res.status(404).json({ message: "Waitlist entry not found." });
