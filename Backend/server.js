@@ -255,6 +255,7 @@ const WATCH_DATA = {
 /* =======================
    Email Templates
 ======================= */
+const FRONTEND_URL = (process.env.FRONTEND_URL || "https://beaheadoftime.vercel.app").replace(/\/$/, "");
 const sendConfirmation = async (email, name, model) => {
   const watch = WATCH_DATA[model] || WATCH_DATA["5am"];
   const success = await sendMailWithRetry({
@@ -293,8 +294,8 @@ const sendConfirmation = async (email, name, model) => {
             
             <!-- Dashboard CTA -->
             <div style="text-align:center; margin:32px 0;">
-              <p style="color:#6060778; font-size:13px; margin:0 0 16px;">Your login credentials have been sent in a separate email.</p>
-              <a href="https://aheadwatches.com/login" style="display:inline-block; background:linear-gradient(135deg,#808098,#b0b0c0); color:#0a0a12; padding:12px 32px; text-decoration:none; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-weight:600; border-radius:4px;">Access Dashboard</a>
+              <p style="color:#606078; font-size:13px; margin:0 0 16px;">Your login credentials have been sent in a separate email.</p>
+              <a href="${FRONTEND_URL}/login" style="display:inline-block; background:linear-gradient(135deg,#808098,#b0b0c0); color:#0a0a12; padding:12px 32px; text-decoration:none; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-weight:600; border-radius:4px;">Access Dashboard</a>
             </div>
           </div>
           
@@ -533,6 +534,34 @@ app.post("/api/user/login", rateLimit(60000, 10), async (req, res) => {
   } catch (err) {
     console.error("❌ User login error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Email-based recovery without revealing whether an address has an account.
+app.post("/api/user/forgot-password", rateLimit(60000, 3), async (req, res) => {
+  const genericMessage = "If an account exists for that email, login details will be sent shortly.";
+  try {
+    const email = sanitize(req.body?.email).toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.json({ message: genericMessage });
+    }
+
+    const user = await Waitlist.findOne({ email });
+    if (user) {
+      const temporaryPassword = crypto.randomBytes(24).toString("hex");
+      const emailSent = await sendPasswordEmail(email, user.name, temporaryPassword);
+      if (emailSent) {
+        const passwordHash = await hashPassword(temporaryPassword);
+        await Waitlist.updateMany({ email }, { $set: { password: passwordHash } });
+        console.log("🔐 Login recovery completed for:", email);
+      } else {
+        console.error("❌ Login recovery email could not be delivered:", email);
+      }
+    }
+    return res.json({ message: genericMessage });
+  } catch (err) {
+    console.error("Login recovery failed:", err.message);
+    return res.json({ message: genericMessage });
   }
 });
 
